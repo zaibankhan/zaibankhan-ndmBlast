@@ -1,9 +1,11 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, session
 from Bio import SeqIO
 import re
 import sqlite3
+from difflib import SequenceMatcher
 
 app = Flask(__name__)
+app.secret_key = "ndm123"
 
 DATABASE_NUCLEOTIDE = "database/NUCLEOTIDE_ndmfinal.txt"
 DATABASE_PROTEIN = "database/PROTEIN_ndmfinal.txt"
@@ -16,7 +18,7 @@ def load_database(file_path):
 
     for record in SeqIO.parse(file_path, "fasta"):
 
-        print("ID= =",record.id)
+        print("ID= =", record.id)
 
         records.append({
             "id": record.id,
@@ -27,22 +29,30 @@ def load_database(file_path):
     return records
 
 
-# SIMILARITY CALCULATE KARNE KE LIYE
+# FIX #1: SIMILARITY CALCULATE KARNE KE LIYE — SequenceMatcher use karo
 def calculate_similarity(query, target):
 
-    matches = 0
-
-    for i in range(min(len(query), len(target))):
-
-        if query[i] == target[i]:
-            matches += 1
-
-    length = max(len(query), len(target))
-
-    if length == 0:
+    if not query or not target:
         return 0
 
-    return round((matches / length) * 100, 2)
+    matcher = SequenceMatcher(None, query, target)
+    similarity = matcher.ratio() * 100
+    return round(similarity, 2)
+
+
+# FIX #2: E-VALUE — Biology-standard approximate formula
+def calculate_evalue(similarity, query_length, db_size=1000000):
+
+    if similarity >= 100:
+        return 0.0
+
+    identity_fraction = similarity / 100.0
+    # Approximate: lower similarity → higher e-value
+    evalue = db_size * query_length * (1 - identity_fraction) ** query_length
+    # Cap to readable range
+    if evalue > 10:
+        evalue = 10.0
+    return round(evalue, 6)
 
 
 # DATABASE SEARCH
@@ -58,11 +68,13 @@ def search_database(query_sequence, database_file):
             query_sequence,
             entry["sequence"]
         )
-        
+        evalue = calculate_evalue(similarity, len(query_sequence))
+
         results.append({
             "name": entry["id"],
             "description": entry["description"],
             "similarity": similarity,
+            "evalue": evalue,
             "sequence": entry["sequence"],
         })
 
@@ -104,17 +116,21 @@ def blastp():
 def runblastn():
 
     sequence = request.form["sequence"]
-
     sequence = sequence.upper()
-
     sequence = re.sub(r"[^ATGC]", "", sequence)
+
+    session["query_sequence"] = sequence
 
     results = search_database(
         sequence,
         DATABASE_NUCLEOTIDE
     )
+    session["blastn_results"] = results
+    session["last_blast"] = "n"
+
     print("RESULTS =", results)
-    print("FIRST NAME =", results[0]["name"])
+    print("FIRST NAME =", results[0]["name"] if results else "No results")
+
     return render_template(
         "BlastN.html",
         results=results
@@ -126,20 +142,47 @@ def runblastn():
 def runblastp():
 
     sequence = request.form["sequence"]
-
     sequence = sequence.upper()
-
     sequence = re.sub(r"[^ARNDCQEGHILKMFPSTWYV]", "", sequence)
+
+    session["query_sequence"] = sequence
 
     results = search_database(
         sequence,
         DATABASE_PROTEIN
     )
+    session["blastp_results"] = results
+    session["last_blast"] = "p"
+
     print("RESULTS =", results)
+
     return render_template(
         "BlastP.html",
         results=results
     )
+
+
+@app.route("/blastp_results")
+def blastp_results():
+
+    results = session.get("blastp_results", [])
+
+    return render_template(
+        "BlastP.html",
+        results=results
+    )
+
+
+@app.route("/blastn_results")
+def blastn_results():
+
+    results = session.get("blastn_results", [])
+
+    return render_template(
+        "BlastN.html",
+        results=results
+    )
+
 
 @app.route("/details/<name>")
 def details(name):
@@ -158,8 +201,8 @@ def details(name):
         (name,)
     )
 
-    row = cursor.fetchone() 
-    
+    row = cursor.fetchone()
+
     print("NAME =", name)
     print("ROW =", row)
 
@@ -167,6 +210,7 @@ def details(name):
 
     if row:
 
+        # FIX #3: Correct field mapping — har field apni sahi jagah pe
         record = {
             "id": row[0],
             "protein_name": row[1],
@@ -175,14 +219,50 @@ def details(name):
             "country": row[4],
             "host_bacteria": row[5],
             "publication": row[6],
-            "sequence": row[7]
+            "sequence": row[7],
+            "detection_technique": row[8] if len(row) > 8 else "N/A"
         }
+
+        blast_type = session.get("last_blast", "")
+        query_seq = session.get("query_sequence", "")
+        subject_seq = row[7]
+
+        match_line = ""
+
+        for q, s in zip(query_seq, subject_seq):
+            if q == s:
+                match_line += "|"
+            else:
+                match_line += " "
+
+        query_length = len(query_seq)
+        subject_length = len(subject_seq)
+
+        # Alignment ko 60-character chunks mein tod do readability ke liye
+        chunk_size = 60
+        alignment_blocks = []
+        for i in range(0, max(len(query_seq), len(subject_seq)), chunk_size):
+            alignment_blocks.append({
+                "query": query_seq[i:i+chunk_size],
+                "match": match_line[i:i+chunk_size],
+                "subject": subject_seq[i:i+chunk_size],
+                "start": i + 1
+            })
 
         return render_template(
             "details.html",
-            record=record
+            record=record,
+            query_seq=query_seq,
+            subject_seq=subject_seq,
+            match_line=match_line,
+            query_length=query_length,
+            subject_length=subject_length,
+            blast_type=blast_type,
+            alignment_blocks=alignment_blocks
         )
 
     return "Record Not Found"
+
+
 if __name__ == "__main__":
     app.run(debug=True)

@@ -1,52 +1,80 @@
 <html>
-
 <head>
 <title>{{ record.id }}</title>
+<style>
+  pre {
+    background: #f4f4f4;
+    padding: 10px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .alignment-block {
+    margin-bottom: 12px;
+  }
+</style>
 </head>
 
 <body style="background-color:lightblue;">
 
 <h1>{{ record.id }}</h1>
-
 <hr>
 
 <h2>NDM Variant</h2>
 <p>{{ record.id }}</p>
 
-<h2>Bacterial species</h2>
+<h2>Bacterial Species</h2>
 <p>{{ record.host_bacteria }}</p>
 
 <h2>Publication</h2>
 <p>{{ record.publication }}</p>
-<button>Open Research Paper</button> 
+<!-- FIX #5: Opening <a> tag add kiya — ab properly linked hai -->
+<a href="{{ record.publication }}" target="_blank">
+  <button>Open Research Paper</button>
 </a>
 
-<h2>⁠isolation source</h2>
+<h2>Isolation Source</h2>
+<!-- FIX #4 (partial): dna_name isolation source ke liye sahi field hai -->
 <p>{{ record.dna_name }}</p>
 
-<h2>Country of isolation</h2>
-<p>{{ record.country}}</p>
-
-<h2>⁠Detection Technique</h2>
+<h2>Country of Isolation</h2>
 <p>{{ record.country }}</p>
 
-<h2>Sequence</h2>
-<textarea rows="15" cols="120" readonly>
-{{ record.sequence }}
-</textarea>
+<!-- FIX #4: Detection Technique mein ab sahi field aa raha hai -->
+<h2>Detection Technique</h2>
+<p>{{ record.detection_technique }}</p>
 
+<br>
 
+<h2>Query Length: {{ query_length }}</h2>
+<h2>Subject Length: {{ subject_length }}</h2>
 
-<br><br>
+<h2>Alignment</h2>
 
-<br><br>
+<!-- FIX #6: Long sequences ke liye 60-char chunks mein alignment display -->
+{% if alignment_blocks %}
+  {% for block in alignment_blocks %}
+  <div class="alignment-block">
+    <pre>Query   {{ block.start }}  : {{ block.query }}
+              {{ block.match }}
+Subject {{ block.start }}  : {{ block.subject }}</pre>
+  </div>
+  {% endfor %}
+{% else %}
+<pre>
+Query   : {{ query_seq }}
+          {{ match_line }}
+Subject : {{ subject_seq }}
+</pre>
+{% endif %}
 
-<a href="/blastn">
-<button>
-Back To BLAST Results
-</button>
-</a>
+<br>
+{% if blast_type == "n" %}
+<button onclick="window.location.href='/blastn_results'">Back To BLAST Results</button>
+{% else %}
+<button onclick="window.location.href='/blastp_results'">Back To BLAST Results</button>
+{% endif %}
 
 </body>
-
 </html>
