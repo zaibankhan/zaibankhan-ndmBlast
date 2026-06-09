@@ -1,0 +1,52 @@
+<html>
+
+<head>
+<title>{{ record.id }}</title>
+</head>
+
+<body style="background-color:lightblue;">
+
+<h1>{{ record.id }}</h1>
+
+<hr>
+
+<h2>NDM Variant</h2>
+<p>{{ record.id }}</p>
+
+<h2>Bacterial species</h2>
+<p>{{ record.host_bacteria }}</p>
+
+<h2>Publication</h2>
+<p>{{ record.publication }}</p>
+<button>Open Research Paper</button> 
+</a>
+
+<h2>⁠isolation source</h2>
+<p>{{ record.dna_name }}</p>
+
+<h2>Country of isolation</h2>
+<p>{{ record.country}}</p>
+
+<h2>⁠Detection Technique</h2>
+<p>{{ record.country }}</p>
+
+<h2>Sequence</h2>
+<textarea rows="15" cols="120" readonly>
+{{ record.sequence }}
+</textarea>
+
+
+
+<br><br>
+
+<br><br>
+
+<a href="/blastn">
+<button>
+Back To BLAST Results
+</button>
+</a>
+
+</body>
+
+</html>
