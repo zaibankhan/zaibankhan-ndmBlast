@@ -227,26 +227,31 @@ def details(name):
         query_seq = session.get("query_sequence", "")
         subject_seq = row[7]
 
-        match_line = ""
+        query_length = len(query_seq)
+        subject_length = len(subject_seq)
+        max_len = max(query_length, subject_length)
 
-        for q, s in zip(query_seq, subject_seq):
-            if q == s:
+        # Query aur subject ko equal length karo — gap character '-' se
+        query_padded   = query_seq.ljust(max_len, '-')
+        subject_padded = subject_seq.ljust(max_len, '-')
+
+        # Match line — poori length pe banao
+        match_line = ""
+        for q, s in zip(query_padded, subject_padded):
+            if q == s and q != '-':
                 match_line += "|"
             else:
                 match_line += " "
 
-        query_length = len(query_seq)
-        subject_length = len(subject_seq)
-
         # Alignment ko 60-character chunks mein tod do readability ke liye
         chunk_size = 60
         alignment_blocks = []
-        for i in range(0, max(len(query_seq), len(subject_seq)), chunk_size):
+        for i in range(0, max_len, chunk_size):
             alignment_blocks.append({
-                "query": query_seq[i:i+chunk_size],
-                "match": match_line[i:i+chunk_size],
-                "subject": subject_seq[i:i+chunk_size],
-                "start": i + 1
+                "query":   query_padded[i:i+chunk_size],
+                "match":   match_line[i:i+chunk_size],
+                "subject": subject_padded[i:i+chunk_size],
+                "start":   i + 1
             })
 
         return render_template(

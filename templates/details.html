@@ -4,14 +4,21 @@
 <style>
   pre {
     background: #f4f4f4;
-    padding: 10px;
+    padding: 12px 16px;
     border-radius: 6px;
     overflow-x: auto;
+    /* CRITICAL: Monospace font — tabhi Query/Match/Subject sahi align rahenge */
+    font-family: "Courier New", Courier, monospace;
     font-size: 13px;
-    line-height: 1.6;
+    line-height: 1.8;
+    white-space: pre;
+    word-break: keep-all;
   }
   .alignment-block {
-    margin-bottom: 12px;
+    margin-bottom: 16px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    overflow: hidden;
   }
 </style>
 </head>
@@ -56,9 +63,9 @@
 {% if alignment_blocks %}
   {% for block in alignment_blocks %}
   <div class="alignment-block">
-    <pre>Query   {{ block.start }}  : {{ block.query }}
+    <pre>Query   {{ "%4d"|format(block.start) }}  {{ block.query }}
               {{ block.match }}
-Subject {{ block.start }}  : {{ block.subject }}</pre>
+Subject {{ "%4d"|format(block.start) }}  {{ block.subject }}</pre>
   </div>
   {% endfor %}
 {% else %}
