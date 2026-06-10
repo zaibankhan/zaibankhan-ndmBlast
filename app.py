@@ -9,47 +9,36 @@ app.secret_key = "ndm123"
 
 DATABASE_NUCLEOTIDE = "database/NUCLEOTIDE_ndmfinal.txt"
 DATABASE_PROTEIN = "database/PROTEIN_ndmfinal.txt"
+DATABASE_FIXED = "database/ndm_fixed.db"
 
 
 # FASTA DATABASE LOAD KARNE KE LIYE
 def load_database(file_path):
-
     records = []
-
     for record in SeqIO.parse(file_path, "fasta"):
-
-        print("ID= =", record.id)
-
         records.append({
             "id": record.id,
             "description": record.description,
             "sequence": str(record.seq).upper()
         })
-
     return records
 
 
-# FIX #1: SIMILARITY CALCULATE KARNE KE LIYE — SequenceMatcher use karo
+# SIMILARITY CALCULATE KARNE KE LIYE — SequenceMatcher use karo
 def calculate_similarity(query, target):
-
     if not query or not target:
         return 0
-
     matcher = SequenceMatcher(None, query, target)
     similarity = matcher.ratio() * 100
     return round(similarity, 2)
 
 
-# FIX #2: E-VALUE — Biology-standard approximate formula
+# E-VALUE — Biology-standard approximate formula
 def calculate_evalue(similarity, query_length, db_size=1000000):
-
     if similarity >= 100:
         return 0.0
-
     identity_fraction = similarity / 100.0
-    # Approximate: lower similarity → higher e-value
     evalue = db_size * query_length * (1 - identity_fraction) ** query_length
-    # Cap to readable range
     if evalue > 10:
         evalue = 10.0
     return round(evalue, 6)
@@ -57,19 +46,11 @@ def calculate_evalue(similarity, query_length, db_size=1000000):
 
 # DATABASE SEARCH
 def search_database(query_sequence, database_file):
-
     database = load_database(database_file)
-
     results = []
-
     for entry in database:
-
-        similarity = calculate_similarity(
-            query_sequence,
-            entry["sequence"]
-        )
+        similarity = calculate_similarity(query_sequence, entry["sequence"])
         evalue = calculate_evalue(similarity, len(query_sequence))
-
         results.append({
             "name": entry["id"],
             "description": entry["description"],
@@ -77,12 +58,7 @@ def search_database(query_sequence, database_file):
             "evalue": evalue,
             "sequence": entry["sequence"],
         })
-
-    results.sort(
-        key=lambda x: x["similarity"],
-        reverse=True
-    )
-
+    results.sort(key=lambda x: x["similarity"], reverse=True)
     return results[:5]
 
 
@@ -114,125 +90,106 @@ def blastp():
 # BLAST N
 @app.route("/runblastn", methods=["POST"])
 def runblastn():
-
     sequence = request.form["sequence"]
     sequence = sequence.upper()
     sequence = re.sub(r"[^ATGC]", "", sequence)
-
     session["query_sequence"] = sequence
-
-    results = search_database(
-        sequence,
-        DATABASE_NUCLEOTIDE
-    )
+    results = search_database(sequence, DATABASE_NUCLEOTIDE)
     session["blastn_results"] = results
     session["last_blast"] = "n"
-
     print("RESULTS =", results)
     print("FIRST NAME =", results[0]["name"] if results else "No results")
-
-    return render_template(
-        "BlastN.html",
-        results=results
-    )
+    return render_template("BlastN.html", results=results)
 
 
 # BLAST P
 @app.route("/runblastp", methods=["POST"])
 def runblastp():
-
     sequence = request.form["sequence"]
     sequence = sequence.upper()
     sequence = re.sub(r"[^ARNDCQEGHILKMFPSTWYV]", "", sequence)
-
     session["query_sequence"] = sequence
-
-    results = search_database(
-        sequence,
-        DATABASE_PROTEIN
-    )
+    results = search_database(sequence, DATABASE_PROTEIN)
     session["blastp_results"] = results
     session["last_blast"] = "p"
-
     print("RESULTS =", results)
-
-    return render_template(
-        "BlastP.html",
-        results=results
-    )
+    return render_template("BlastP.html", results=results)
 
 
 @app.route("/blastp_results")
 def blastp_results():
-
     results = session.get("blastp_results", [])
-
-    return render_template(
-        "BlastP.html",
-        results=results
-    )
+    return render_template("BlastP.html", results=results)
 
 
 @app.route("/blastn_results")
 def blastn_results():
-
     results = session.get("blastn_results", [])
-
-    return render_template(
-        "BlastN.html",
-        results=results
-    )
+    return render_template("BlastN.html", results=results)
 
 
 @app.route("/details/<name>")
 def details(name):
 
-    conn = sqlite3.connect("database/ndm.db")
-    cursor = conn.cursor()
-    cursor.execute("PRAGMA table_info(ndm_variants)")
-    print(cursor.fetchall())
-    cursor.execute("SELECT variant_id FROM ndm_variants")
-    print(cursor.fetchall()[:5])
+    blast_type = session.get("last_blast", "p")
 
-    print("NAME REPR=", repr(name))
+    conn = sqlite3.connect(DATABASE_FIXED)
+    cursor = conn.cursor()
+
+    # *** KEY FIX: blast_type ke hisaab se SAHI TABLE se sequence lo ***
+    # BlastN → ndm_nucleotide table (DNA sequences)
+    # BlastP → ndm_protein table (Protein sequences)
+    if blast_type == "n":
+        table = "ndm_nucleotide"
+    else:
+        table = "ndm_protein"
 
     cursor.execute(
-        "SELECT * FROM ndm_variants WHERE variant_id=?",
+        f"SELECT variant_id, description, sequence FROM {table} WHERE variant_id=?",
         (name,)
     )
+    seq_row = cursor.fetchone()
 
-    row = cursor.fetchone()
-
-    print("NAME =", name)
-    print("ROW =", row)
+    # Metadata (country, host, publication etc.) ndm_variants se lo agar ho
+    meta_row = None
+    try:
+        cursor.execute(
+            "SELECT * FROM ndm_variants WHERE variant_id=?",
+            (name,)
+        )
+        meta_row = cursor.fetchone()
+    except Exception:
+        pass
 
     conn.close()
 
-    if row:
+    print("NAME =", name, "| blast_type =", blast_type, "| table =", table)
+    print("seq_row found:", seq_row is not None)
 
-        # FIX #3: Correct field mapping — har field apni sahi jagah pe
+    if seq_row:
+
+        subject_seq = seq_row[2]  # Sahi table se sahi sequence
+
         record = {
-            "id": row[0],
-            "protein_name": row[1],
-            "dna_name": row[2],
-            "description": row[3],
-            "country": row[4],
-            "host_bacteria": row[5],
-            "publication": row[6],
-            "sequence": row[7],
-            "detection_technique": row[8] if len(row) > 8 else "N/A"
+            "id": seq_row[0],
+            "description": seq_row[1],
+            "protein_name": meta_row[1] if meta_row and len(meta_row) > 1 else "",
+            "dna_name": meta_row[2] if meta_row and len(meta_row) > 2 else "",
+            "country": meta_row[4] if meta_row and len(meta_row) > 4 else "",
+            "host_bacteria": meta_row[5] if meta_row and len(meta_row) > 5 else "",
+            "publication": meta_row[6] if meta_row and len(meta_row) > 6 else "",
+            "sequence": subject_seq,
+            "detection_technique": meta_row[8] if meta_row and len(meta_row) > 8 else "N/A"
         }
 
-        blast_type = session.get("last_blast", "")
         query_seq = session.get("query_sequence", "")
-        subject_seq = row[7]
 
         query_length = len(query_seq)
         subject_length = len(subject_seq)
         max_len = max(query_length, subject_length)
 
         # Query aur subject ko equal length karo — gap character '-' se
-        query_padded   = query_seq.ljust(max_len, '-')
+        query_padded = query_seq.ljust(max_len, '-')
         subject_padded = subject_seq.ljust(max_len, '-')
 
         # Match line — poori length pe banao
@@ -248,10 +205,10 @@ def details(name):
         alignment_blocks = []
         for i in range(0, max_len, chunk_size):
             alignment_blocks.append({
-                "query":   query_padded[i:i+chunk_size],
-                "match":   match_line[i:i+chunk_size],
+                "query": query_padded[i:i+chunk_size],
+                "match": match_line[i:i+chunk_size],
                 "subject": subject_padded[i:i+chunk_size],
-                "start":   i + 1
+                "start": i + 1
             })
 
         return render_template(

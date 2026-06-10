@@ -1,41 +1,37 @@
 from Bio import SeqIO
 import sqlite3
 
-conn = sqlite3.connect("database/ndm.db")
+conn = sqlite3.connect("database/ndm_fixed.db")
 cursor = conn.cursor()
 
-# PROTEIN DATA INSERT
-for record in SeqIO.parse("database/PROTEIN_ndmfinal.txt", "fasta"):
-
-    try:
-        cursor.execute("""
-        INSERT OR IGNORE INTO ndm_variants
-        VALUES (?, '', '', ?, '', '', 'https://pubmed.ncbi.nlm.nih.gov/', ?)
-        """, (
-            record.id,
-            record.description,
-            str(record.seq)
-        ))
-    except Exception as e:
-        print(e)
-
-# NUCLEOTIDE DATA INSERT
+# NUCLEOTIDE DATA — ndm_nucleotide table mein
+n_count = 0
 for record in SeqIO.parse("database/NUCLEOTIDE_ndmfinal.txt", "fasta"):
-
     try:
-        cursor.execute("""
-        INSERT OR IGNORE INTO ndm_variants
-        VALUES (?, '', '', ?, '', '', 'https://pubmed.ncbi.nlm.nih.gov/', ?)
-        """, (
-            record.id,
-            record.description,
-            str(record.seq)
-        ))
+        cursor.execute(
+            "INSERT OR REPLACE INTO ndm_nucleotide VALUES (?, ?, ?)",
+            (record.id, record.description, str(record.seq).upper())
+        )
+        n_count += 1
     except Exception as e:
-        print(e)
+        print("NUC error:", e)
 
+print(f"Nucleotide records inserted: {n_count}")
+
+# PROTEIN DATA — ndm_protein table mein
+p_count = 0
+for record in SeqIO.parse("database/PROTEIN_ndmfinal.txt", "fasta"):
+    try:
+        cursor.execute(
+            "INSERT OR REPLACE INTO ndm_protein VALUES (?, ?, ?)",
+            (record.id, record.description, str(record.seq).upper())
+        )
+        p_count += 1
+    except Exception as e:
+        print("PRO error:", e)
+
+print(f"Protein records inserted: {p_count}")
 
 conn.commit()
 conn.close()
-
-print("Done")
+print("Done! ndm_fixed.db ready.")
