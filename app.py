@@ -1,109 +1,124 @@
 from flask import Flask, render_template, request, session, redirect, url_for
 from Bio import SeqIO
-from Bio.Blast import NCBIXML
 import re
 import sqlite3
-import tempfile
-import os
-import subprocess
+import math
 
 app = Flask(__name__)
 app.secret_key = "ndm123"
 
-BLAST_NUCL_DB = "database/blast_db/ndm_nucl"
-BLAST_PROT_DB = "database/blast_db/ndm_prot"
-DATABASE_FIXED = "database/ndm_fixed.db"
+DATABASE_NUCLEOTIDE = "database/NUCLEOTIDE_ndmfinal.txt"
+DATABASE_PROTEIN    = "database/PROTEIN_ndmfinal.txt"
+DATABASE_FIXED      = "database/ndm_fixed.db"
 
 
-def run_blast(query_sequence, blast_type="n", top_n=5):
+# ── DATABASE LOAD ─────────────────────────────────────────────────────────────
+def load_database(file_path):
+    records = []
+    for record in SeqIO.parse(file_path, "fasta"):
+        records.append({
+            "id":          record.id,
+            "description": record.description,
+            "sequence":    str(record.seq).upper()
+        })
+    return records
+
+
+# ── SIMILARITY — Direct positional comparison (most accurate for NDM variants)
+# Aapka data same-length sequences hai (810-828bp), isliye direct comparison best hai
+def calculate_similarity(query, target):
+    if not query or not target:
+        return 0.0
+
+    # Matched positions / longer sequence length
+    matches = sum(1 for a, b in zip(query, target) if a == b)
+    length  = max(len(query), len(target))
+    return round((matches / length) * 100, 2)
+
+
+# ── E-VALUE — Mismatch based meaningful formula ──────────────────────────────
+def calculate_evalue(similarity, query_length, db_size=67):
     """
-    subprocess se local BLAST run karo — Bio.Blast.Applications nahi chahiye.
-    Sirf local database use hogi — internet se kuch nahi.
+    similarity 100%  → E-value 0.0       (perfect match)
+    similarity 99%   → E-value ~0.0001   (very significant)
+    similarity 80%   → E-value ~0.001    (significant)
+    similarity 42%   → E-value ~0.75     (low significance)
+    similarity <30%  → E-value ~10       (not significant)
     """
-    results = []
+    if similarity >= 100.0:
+        return 0.0
+    if similarity <= 0.0:
+        return 10.0
 
-    # Query temp FASTA file mein likho
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".fasta",
-                                     delete=False) as qf:
-        qf.write(f">query\n{query_sequence}\n")
-        query_file = qf.name
-
-    out_file = query_file + "_blast.xml"
+    mismatch_fraction = 1.0 - (similarity / 100.0)
+    norm_len = query_length / 100.0
 
     try:
-        if blast_type == "n":
-            cmd = [
-                "blastn",
-                "-query", query_file,
-                "-db", BLAST_NUCL_DB,
-                "-outfmt", "5",
-                "-out", out_file,
-                "-max_target_seqs", str(top_n),
-                "-evalue", "10",
-                "-word_size", "7",
-                "-dust", "no",
-            ]
-        else:
-            cmd = [
-                "blastp",
-                "-query", query_file,
-                "-db", BLAST_PROT_DB,
-                "-outfmt", "5",
-                "-out", out_file,
-                "-max_target_seqs", str(top_n),
-                "-evalue", "10",
-                "-word_size", "2",
-            ]
+        evalue = db_size * (mismatch_fraction ** norm_len)
+        return round(min(evalue, 10.0), 4)
+    except Exception:
+        return 10.0
 
-        # BLAST run karo locally
-        proc = subprocess.run(cmd, capture_output=True, text=True)
 
-        if proc.returncode != 0:
-            print("BLAST stderr:", proc.stderr)
-            return results
+# ── SEARCH DATABASE ───────────────────────────────────────────────────────────
+def search_database(query_sequence, database_file):
+    database = load_database(database_file)
+    results  = []
 
-        # XML parse karo
-        with open(out_file) as result_handle:
-            blast_records = list(NCBIXML.parse(result_handle))
+    for entry in database:
+        similarity = calculate_similarity(query_sequence, entry["sequence"])
+        evalue     = calculate_evalue(similarity, len(query_sequence))
 
-        if blast_records and blast_records[0].alignments:
-            for alignment in blast_records[0].alignments[:top_n]:
-                hsp = alignment.hsps[0]
-
-                identity = round((hsp.identities / hsp.align_length) * 100, 2)
-                evalue   = hsp.expect
-
-                subject_id = alignment.hit_id
-                if "|" in subject_id:
-                    subject_id = subject_id.split("|")[-1]
-                if not subject_id or subject_id == "N/A":
-                    subject_id = alignment.hit_def.split()[0]
-
-                results.append({
-                    "name":        subject_id,
-                    "description": alignment.hit_def,
-                    "similarity":  identity,
-                    "evalue":      evalue,
-                    "sequence":    hsp.sbjct.replace("-", ""),
-                    "query_hsp":   hsp.query,
-                    "subject_hsp": hsp.sbjct,
-                    "match_hsp":   hsp.match,
-                    "q_start":     hsp.query_start,
-                    "s_start":     hsp.sbjct_start,
-                    "align_len":   hsp.align_length,
-                })
-
-    except Exception as e:
-        print("BLAST error:", e)
-
-    finally:
-        if os.path.exists(query_file): os.remove(query_file)
-        if os.path.exists(out_file):   os.remove(out_file)
+        results.append({
+            "name":        entry["id"],
+            "description": entry["description"],
+            "similarity":  similarity,
+            "evalue":      evalue,
+            "sequence":    entry["sequence"],
+        })
 
     results.sort(key=lambda x: x["similarity"], reverse=True)
-    return results
+    return results[:5]
 
 
+# ── ALIGNMENT BUILDER ─────────────────────────────────────────────────────────
+def build_alignment(query_seq, subject_seq):
+    """
+    Poori query aur poora subject align karo.
+    Chhoti sequence ko '-' se pad karo.
+    """
+    max_len         = max(len(query_seq), len(subject_seq))
+    query_padded    = query_seq.ljust(max_len, "-")
+    subject_padded  = subject_seq.ljust(max_len, "-")
+
+    match_line = ""
+    for q, s in zip(query_padded, subject_padded):
+        if q == "-" or s == "-":
+            match_line += " "   # gap
+        elif q == s:
+            match_line += "|"   # exact match
+        else:
+            match_line += "."   # mismatch
+
+    # 60-char chunks mein tod do
+    chunk_size = 60
+    blocks     = []
+    for i in range(0, max_len, chunk_size):
+        q_chunk = query_padded[i:i+chunk_size]
+        m_chunk = match_line[i:i+chunk_size]
+        s_chunk = subject_padded[i:i+chunk_size]
+        if q_chunk.strip("-") or s_chunk.strip("-"):
+            blocks.append({
+                "query":   q_chunk,
+                "match":   m_chunk,
+                "subject": s_chunk,
+                "start":   i + 1,
+            })
+
+    return blocks, match_line
+
+
+# ── ROUTES ────────────────────────────────────────────────────────────────────
 @app.route("/")
 def home():
     return render_template("HomeInfo.html")
@@ -134,13 +149,10 @@ def runblastn():
     session["query_sequence"] = sequence
     session["last_blast"]     = "n"
 
-    results = run_blast(sequence, blast_type="n")
+    results = search_database(sequence, DATABASE_NUCLEOTIDE)
     session["blastn_results"] = results
 
-    print("BlastN hits:", len(results))
-    if results:
-        print("Top:", results[0]["name"], results[0]["similarity"], "%", "E:", results[0]["evalue"])
-
+    print("BlastN top hit:", results[0]["name"], results[0]["similarity"], "%" if results else "No results")
     return redirect(url_for("blastn_results"))
 
 
@@ -153,13 +165,10 @@ def runblastp():
     session["query_sequence"] = sequence
     session["last_blast"]     = "p"
 
-    results = run_blast(sequence, blast_type="p")
+    results = search_database(sequence, DATABASE_PROTEIN)
     session["blastp_results"] = results
 
-    print("BlastP hits:", len(results))
-    if results:
-        print("Top:", results[0]["name"], results[0]["similarity"], "%", "E:", results[0]["evalue"])
-
+    print("BlastP top hit:", results[0]["name"], results[0]["similarity"], "%" if results else "No results")
     return redirect(url_for("blastp_results"))
 
 
@@ -179,20 +188,25 @@ def details(name):
     blast_type = session.get("last_blast", "p")
 
     if blast_type == "n":
-        all_results = session.get("blastn_results", [])
         query_seq   = session.get("blastn_query", "")
+        all_results = session.get("blastn_results", [])
     else:
-        all_results = session.get("blastp_results", [])
         query_seq   = session.get("blastp_query", "")
+        all_results = session.get("blastp_results", [])
 
-    hit = next((r for r in all_results if r["name"] == name), None)
-
+    # DB se sahi sequence lo
     conn = sqlite3.connect(DATABASE_FIXED)
     cursor = conn.cursor()
     if blast_type == "n":
-        cursor.execute("SELECT variant_id, description, sequence FROM ndm_nucleotide WHERE variant_id=?", (name,))
+        cursor.execute(
+            "SELECT variant_id, description, sequence FROM ndm_nucleotide WHERE variant_id=?",
+            (name,)
+        )
     else:
-        cursor.execute("SELECT variant_id, description, sequence FROM ndm_protein WHERE variant_id=?", (name,))
+        cursor.execute(
+            "SELECT variant_id, description, sequence FROM ndm_protein WHERE variant_id=?",
+            (name,)
+        )
     seq_row = cursor.fetchone()
 
     meta_row = None
@@ -203,7 +217,7 @@ def details(name):
         pass
     conn.close()
 
-    subject_seq = seq_row[2] if seq_row else (hit["sequence"] if hit else "")
+    subject_seq = seq_row[2] if seq_row else ""
 
     record = {
         "id":                  name,
@@ -217,43 +231,18 @@ def details(name):
         "detection_technique": meta_row[8] if meta_row and len(meta_row) > 8 else "N/A"
     }
 
-    if hit and "query_hsp" in hit:
-        query_aligned   = hit["query_hsp"]
-        subject_aligned = hit["subject_hsp"]
-        match_str       = hit["match_hsp"]
-        q_start         = hit["q_start"]
-        s_start         = hit["s_start"]
-    else:
-        max_len         = max(len(query_seq), len(subject_seq))
-        query_aligned   = query_seq.ljust(max_len, "-")
-        subject_aligned = subject_seq.ljust(max_len, "-")
-        match_str       = "".join(
-            "|" if a == b and a != "-" else " "
-            for a, b in zip(query_aligned, subject_aligned)
-        )
-        q_start = s_start = 1
+    # Result stats
+    hit = next((r for r in all_results if r["name"] == name), None)
 
-    chunk_size = 60
-    alignment_blocks = []
-    align_len = max(len(query_aligned), len(subject_aligned))
-    for i in range(0, align_len, chunk_size):
-        q_chunk = query_aligned[i:i+chunk_size]
-        m_chunk = match_str[i:i+chunk_size]
-        s_chunk = subject_aligned[i:i+chunk_size]
-        if q_chunk.strip("-") or s_chunk.strip("-"):
-            alignment_blocks.append({
-                "query":   q_chunk,
-                "match":   m_chunk,
-                "subject": s_chunk,
-                "q_pos":   q_start + i,
-                "s_pos":   s_start + i,
-            })
+    # Alignment build karo
+    alignment_blocks, match_line = build_alignment(query_seq, subject_seq)
 
     return render_template(
         "details.html",
         record=record,
         query_seq=query_seq,
         subject_seq=subject_seq,
+        match_line=match_line,
         query_length=len(query_seq),
         subject_length=len(subject_seq),
         blast_type=blast_type,
