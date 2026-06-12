@@ -2,23 +2,65 @@
 <head>
 <title>BlastN</title>
 <style>
-  #wave-canvas {
+  /* Full screen loader overlay */
+  #loader {
     display: none;
-    margin: 20px auto;
-    border-radius: 12px;
-    background: transparent;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.55);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
   }
-  #wave-label {
-    display: none;
-    text-align: center;
-    font-size: 15px;
-    color: #555;
-    margin-bottom: 10px;
+
+  /* Wave bars */
+  .wave {
+    display: flex;
+    gap: 12px;
+  }
+  .wave span {
+    width: 15px;
+    height: 100px;
+    border-radius: 20px;
+    animation: waveBounce 1s infinite ease-in-out;
+  }
+  .wave span:nth-child(1) { background: red;    animation-delay: 0.0s; }
+  .wave span:nth-child(2) { background: orange; animation-delay: 0.1s; }
+  .wave span:nth-child(3) { background: yellow; animation-delay: 0.2s; }
+  .wave span:nth-child(4) { background: lime;   animation-delay: 0.3s; }
+  .wave span:nth-child(5) { background: cyan;   animation-delay: 0.4s; }
+  .wave span:nth-child(6) { background: blue;   animation-delay: 0.5s; }
+  .wave span:nth-child(7) { background: purple; animation-delay: 0.6s; }
+
+  @keyframes waveBounce {
+    0%, 100% { transform: scaleY(0.5); }
+    50%       { transform: scaleY(1.8); }
+  }
+
+  .loading-text {
+    margin-top: 30px;
+    color: white;
+    font-size: 32px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    font-family: Arial, sans-serif;
   }
 </style>
 </head>
 
 <body style="background-color:lightblue;">
+
+<!-- LOADER OVERLAY -->
+<div id="loader">
+  <div class="wave">
+    <span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span>
+  </div>
+  <div class="loading-text">Running BLAST...</div>
+</div>
+
 <hr style="border:2px solid white;">
 <h1 style="text-align:center; color:black; margin-bottom:10px;">BlastN Tool</h1>
 <hr style="border: 2px solid black; width:90%; margin:0 auto 20px auto;">
@@ -31,25 +73,19 @@
 
 <br><br>
 
-<form method="POST" action="/runblastn">
+<form id="blastForm" method="POST" action="/runblastn">
   <p><b>Enter DNA Sequence</b></p>
   <textarea name="sequence" rows="10" cols="60"></textarea>
   <br><br>
-  <!-- FIX #7: showLoader() function ab define hai neeche -->
-  <button type="submit" onclick="showLoader()">Run Blast</button>
+  <button type="submit">Run Blast</button>
 </form>
-
-<div id="wave-label">Blast Running... please wait</div>
-<canvas id="wave-canvas" width="620" height="180"></canvas>
 
 <p style="color:green;">Database: Local NDM Database</p>
 
 <p style="color:blue;">Total Results = {{ results|length }}</p>
 
 {% if results %}
-
 <h1 style="color:red;">RESULT FOUND</h1>
-
 <table border="1" cellpadding="10" cellspacing="0">
   <tr>
     <th>NDM Variant</th>
@@ -58,27 +94,21 @@
     <th>Description</th>
     <th>Sequence</th>
   </tr>
-
   {% for item in results %}
   <tr>
-    <td>
-      <a href="/details/{{ item.name }}">{{ item.name }}</a>
-    </td>
+    <td><a href="/details/{{ item.name }}">{{ item.name }}</a></td>
     <td>{{ item.similarity }}%</td>
     <td>{{ item.evalue }}</td>
     <td>{{ item.description }}</td>
     <td>
       <details>
         <summary>View Sequence</summary>
-        <!-- FIX #8: trim filter se extra whitespace hatao -->
         <textarea rows="8" cols="80" readonly>{{ item.sequence | trim }}</textarea>
       </details>
     </td>
   </tr>
   {% endfor %}
-
 </table>
-
 {% else %}
 <p style="color:red;">No Results Yet. Please enter a DNA sequence and run BLAST.</p>
 {% endif %}
@@ -92,40 +122,30 @@
   </a>
 </div>
 
-<!-- FIX #7: showLoader() function define kiya — wave animation ke saath -->
 <script>
-function showLoader() {
-  var label = document.getElementById("wave-label");
-  var canvas = document.getElementById("wave-canvas");
-
-  label.style.display = "block";
-  canvas.style.display = "block";
-
-  var ctx = canvas.getContext("2d");
-  var offset = 0;
-
-  function drawWave() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.beginPath();
-    ctx.strokeStyle = "purple";
-    ctx.lineWidth = 2.5;
-
-    for (var x = 0; x < canvas.width; x++) {
-      var y = canvas.height / 2 + 40 * Math.sin((x + offset) * 0.05);
-      if (x === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
+  // bfcache fix: back button se aane par fresh reload
+  window.addEventListener("pageshow", function(event) {
+    if (event.persisted) {
+      window.location.reload();
     }
+    // Loader hamesha band rakho fresh load par
+    document.getElementById("loader").style.display = "none";
+  });
 
-    ctx.stroke();
-    offset += 3;
-    requestAnimationFrame(drawWave);
-  }
+  // Form submit — loader dikhao, minimum 3.5 sec baad submit karo
+  document.getElementById("blastForm").addEventListener("submit", function(e) {
+    e.preventDefault(); // Form ko rokke rakhو
 
-  drawWave();
-}
+    var form = this;
+
+    // Loader dikhaо
+    document.getElementById("loader").style.display = "flex";
+
+    // 3.5 second baad form submit karo
+    setTimeout(function() {
+      form.submit();
+    }, 3500);
+  });
 </script>
 
 </body>

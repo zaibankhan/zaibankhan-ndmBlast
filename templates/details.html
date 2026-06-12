@@ -2,12 +2,13 @@
 <head>
 <title>{{ record.id }}</title>
 <style>
+  body { font-family: Arial, sans-serif; }
+
   pre {
     background: #f4f4f4;
     padding: 12px 16px;
     border-radius: 6px;
     overflow-x: auto;
-    /* CRITICAL: Monospace font — tabhi Query/Match/Subject sahi align rahenge */
     font-family: "Courier New", Courier, monospace;
     font-size: 13px;
     line-height: 1.8;
@@ -20,6 +21,20 @@
     border-radius: 6px;
     overflow: hidden;
   }
+
+  /* BLAST stats box */
+  .blast-stats {
+    background: #e8f4e8;
+    border: 1px solid #4caf50;
+    border-radius: 8px;
+    padding: 14px 20px;
+    margin: 20px 0;
+    font-size: 15px;
+  }
+  .blast-stats table { border-collapse: collapse; }
+  .blast-stats td { padding: 4px 20px 4px 0; }
+  .blast-stats td:first-child { font-weight: bold; color: #333; }
+  .blast-stats td:last-child { color: #1a6e1a; font-weight: bold; }
 </style>
 </head>
 
@@ -32,48 +47,55 @@
 <p>{{ record.id }}</p>
 
 <h2>Bacterial Species</h2>
-<p>{{ record.host_bacteria }}</p>
+<p>{{ record.host_bacteria or "—" }}</p>
 
 <h2>Publication</h2>
-<p>{{ record.publication }}</p>
-<!-- FIX #5: Opening <a> tag add kiya — ab properly linked hai -->
+<p>{{ record.publication or "—" }}</p>
+{% if record.publication %}
 <a href="{{ record.publication }}" target="_blank">
   <button>Open Research Paper</button>
 </a>
+{% endif %}
 
 <h2>Isolation Source</h2>
-<!-- FIX #4 (partial): dna_name isolation source ke liye sahi field hai -->
-<p>{{ record.dna_name }}</p>
+<p>{{ record.dna_name or "—" }}</p>
 
 <h2>Country of Isolation</h2>
-<p>{{ record.country }}</p>
+<p>{{ record.country or "—" }}</p>
 
-<!-- FIX #4: Detection Technique mein ab sahi field aa raha hai -->
 <h2>Detection Technique</h2>
-<p>{{ record.detection_technique }}</p>
+<p>{{ record.detection_technique or "N/A" }}</p>
 
 <br>
 
+<!-- BLAST Stats Box -->
+{% if hit %}
+<div class="blast-stats">
+  <b>BLAST Alignment Statistics</b>
+  <table>
+    <tr><td>Identity</td>      <td>{{ hit.similarity }}%  ({{ hit.align_len }} bp aligned)</td></tr>
+    <tr><td>E-value</td>       <td>{{ hit.evalue }}</td></tr>
+    <tr><td>Query Start</td>   <td>{{ hit.q_start }}</td></tr>
+    <tr><td>Subject Start</td> <td>{{ hit.s_start }}</td></tr>
+    <tr><td>Query Length</td>  <td>{{ query_length }}</td></tr>
+    <tr><td>Subject Length</td><td>{{ subject_length }}</td></tr>
+  </table>
+</div>
+{% else %}
 <h2>Query Length: {{ query_length }}</h2>
 <h2>Subject Length: {{ subject_length }}</h2>
+{% endif %}
 
 <h2>Alignment</h2>
 
-<!-- FIX #6: Long sequences ke liye 60-char chunks mein alignment display -->
 {% if alignment_blocks %}
   {% for block in alignment_blocks %}
   <div class="alignment-block">
-    <pre>Query   {{ "%4d"|format(block.start) }}  {{ block.query }}
+    <pre>Query   {{ "%4d"|format(block.q_pos) }}  {{ block.query }}
               {{ block.match }}
-Subject {{ "%4d"|format(block.start) }}  {{ block.subject }}</pre>
+Subject {{ "%4d"|format(block.s_pos) }}  {{ block.subject }}</pre>
   </div>
   {% endfor %}
-{% else %}
-<pre>
-Query   : {{ query_seq }}
-          {{ match_line }}
-Subject : {{ subject_seq }}
-</pre>
 {% endif %}
 
 <br>

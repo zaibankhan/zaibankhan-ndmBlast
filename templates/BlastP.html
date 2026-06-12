@@ -1,9 +1,66 @@
 <html>
 <head>
 <title>BlastP</title>
+<style>
+  /* Full screen loader overlay */
+  #loader {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.55);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+  }
+
+  /* Spinning circle */
+  .loader-circle {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: 10px solid rgba(255,255,255,0.15);
+    border-top:    10px solid red;
+    border-right:  10px solid blue;
+    border-bottom: 10px solid yellow;
+    border-left:   10px solid green;
+    box-shadow: 0px 0px 30px pink;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0%   { transform: rotate(0deg)   scale(1);   }
+    50%  { transform: rotate(180deg) scale(1.2); }
+    100% { transform: rotate(360deg) scale(1);   }
+  }
+
+  .loading-text {
+    margin-top: 25px;
+    font-size: 30px;
+    font-weight: bold;
+    color: white;
+    letter-spacing: 2px;
+    font-family: Arial, sans-serif;
+    animation: blink 1s infinite;
+  }
+
+  @keyframes blink {
+    0%   { opacity: 0.3; }
+    50%  { opacity: 1;   }
+    100% { opacity: 0.3; }
+  }
+</style>
 </head>
 
 <body style="background-color:orange;">
+
+<!-- LOADER OVERLAY -->
+<div id="loader">
+  <div class="loader-circle"></div>
+  <div class="loading-text">Running BLAST...</div>
+</div>
+
 <hr style="border:2px solid white;">
 <h1 style="text-align:center; color:black; margin-bottom:10px;">BlastP Tool</h1>
 <hr style="border: 2px solid black; width:90%; margin:0 auto 20px auto;">
@@ -16,11 +73,10 @@
 
 <br><br>
 
-<form method="POST" action="/runblastp">
+<form id="blastForm" method="POST" action="/runblastp">
   <p><b>Enter Protein Sequence</b></p>
   <textarea name="sequence" rows="10" cols="60"></textarea>
   <br><br>
-  <!-- FIX #9: Alert hata diya — form normally submit hoga -->
   <button type="submit">Run Blast</button>
 </form>
 
@@ -29,10 +85,8 @@
 <p style="color:blue;">Total Results = {{ results|length }}</p>
 
 {% if results %}
-
 <h1 style="color:red;">RESULT FOUND</h1>
 <h2>Top Matches</h2>
-
 <table border="1" cellpadding="10" cellspacing="0">
   <tr>
     <th>NDM Variant</th>
@@ -41,29 +95,22 @@
     <th>Description</th>
     <th>Sequence</th>
   </tr>
-
   {% for item in results %}
   <tr>
-    <td>
-      <a href="/details/{{ item.name }}">{{ item.name }}</a>
-    </td>
+    <td><a href="/details/{{ item.name }}">{{ item.name }}</a></td>
     <td>{{ item.similarity }}%</td>
     <td>{{ item.evalue }}</td>
     <td>{{ item.description }}</td>
     <td>
       <details>
         <summary>View Sequence</summary>
-        <!-- FIX #8: trim filter lagaya extra whitespace ke liye -->
         <textarea rows="8" cols="80" readonly>{{ item.sequence | trim }}</textarea>
       </details>
     </td>
   </tr>
   {% endfor %}
-
 </table>
-
 {% else %}
-<!-- FIX #10: Duplicate "Database" text hata diya -->
 <p style="color:red;">No Results Yet. Please enter a protein sequence and run BLAST.</p>
 {% endif %}
 
@@ -72,6 +119,26 @@
     <button style="background-color:purple; color:white; padding:10px 25px; font-size:18px; margin-right:30px;">Prev Page</button>
   </a>
 </div>
+
+<script>
+  // bfcache fix: back button se aane par fresh reload
+  window.addEventListener("pageshow", function(event) {
+    if (event.persisted) {
+      window.location.reload();
+    }
+    document.getElementById("loader").style.display = "none";
+  });
+
+  // Form submit — loader dikhao, 3.5 sec baad submit karo
+  document.getElementById("blastForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+    var form = this;
+    document.getElementById("loader").style.display = "flex";
+    setTimeout(function() {
+      form.submit();
+    }, 3500);
+  });
+</script>
 
 </body>
 </html>
