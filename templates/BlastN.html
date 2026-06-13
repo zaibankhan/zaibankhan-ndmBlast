@@ -2,75 +2,46 @@
 <head>
 <title>BlastN</title>
 <style>
-  /* Full screen loader overlay */
   #loader {
     display: none;
     position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: rgba(0,0,0,0.55);
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(255,255,255,0.82);
     z-index: 9999;
     justify-content: center;
     align-items: center;
     flex-direction: column;
   }
-
-  /* Wave bars */
-  .wave {
-    display: flex;
-    gap: 12px;
-  }
-  .wave span {
-    width: 15px;
-    height: 100px;
-    border-radius: 20px;
-    animation: waveBounce 1s infinite ease-in-out;
-  }
-  .wave span:nth-child(1) { background: red;    animation-delay: 0.0s; }
-  .wave span:nth-child(2) { background: orange; animation-delay: 0.1s; }
-  .wave span:nth-child(3) { background: yellow; animation-delay: 0.2s; }
-  .wave span:nth-child(4) { background: lime;   animation-delay: 0.3s; }
-  .wave span:nth-child(5) { background: cyan;   animation-delay: 0.4s; }
-  .wave span:nth-child(6) { background: blue;   animation-delay: 0.5s; }
-  .wave span:nth-child(7) { background: purple; animation-delay: 0.6s; }
-
-  @keyframes waveBounce {
-    0%, 100% { transform: scaleY(0.5); }
-    50%       { transform: scaleY(1.8); }
-  }
-
+  #dna-canvas { display: block; }
   .loading-text {
-    margin-top: 30px;
-    color: white;
-    font-size: 32px;
+    margin-top: 18px;
+    color: #1a5cb5;
+    font-size: 26px;
     font-weight: bold;
-    letter-spacing: 2px;
-    font-family: Arial, sans-serif;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 3px;
+    animation: blink 1.2s infinite;
   }
+  @keyframes blink { 0%,100%{opacity:.3} 50%{opacity:1} }
 </style>
 </head>
-
 <body style="background-color:lightblue;">
 
-<!-- LOADER OVERLAY -->
+<!-- LOADER -->
 <div id="loader">
-  <div class="wave">
-    <span></span><span></span><span></span><span></span>
-    <span></span><span></span><span></span>
-  </div>
+  <canvas id="dna-canvas" width="680" height="280"></canvas>
   <div class="loading-text">Running BLAST...</div>
 </div>
 
 <hr style="border:2px solid white;">
-<h1 style="text-align:center; color:black; margin-bottom:10px;">BlastN Tool</h1>
-<hr style="border: 2px solid black; width:90%; margin:0 auto 20px auto;">
+<h1 style="text-align:center;color:black;margin-bottom:10px;">BlastN Tool</h1>
+<hr style="border:2px solid black;width:90%;margin:0 auto 20px auto;">
 
-<div style="display:flex; justify-content:space-evenly; margin-top:30px;">
-  <a href="/"><button style="background-color:purple; color:white; padding:10px 25px; font-size:18px;">Home</button></a>
-  <a href="/blastn"><button style="background-color:purple; color:white; padding:10px 25px; font-size:18px;">nBLAST-NDM</button></a>
-  <a href="/blastp"><button style="background-color:purple; color:white; padding:10px 25px; font-size:18px;">pBLAST-NDM</button></a>
+<div style="display:flex;justify-content:space-evenly;margin-top:30px;">
+  <a href="/"><button style="background-color:purple;color:white;padding:10px 25px;font-size:18px;">Home</button></a>
+  <a href="/blastn"><button style="background-color:purple;color:white;padding:10px 25px;font-size:18px;">nBLAST-NDM</button></a>
+  <a href="/blastp"><button style="background-color:purple;color:white;padding:10px 25px;font-size:18px;">pBLAST-NDM</button></a>
 </div>
-
 <br><br>
 
 <form id="blastForm" method="POST" action="/runblastn">
@@ -81,18 +52,14 @@
 </form>
 
 <p style="color:green;">Database: Local NDM Database</p>
-
 <p style="color:blue;">Total Results = {{ results|length }}</p>
 
 {% if results %}
 <h1 style="color:red;">RESULT FOUND</h1>
 <table border="1" cellpadding="10" cellspacing="0">
   <tr>
-    <th>NDM Variant</th>
-    <th>Identity (%)</th>
-    <th>E-value</th>
-    <th>Description</th>
-    <th>Sequence</th>
+    <th>NDM Variant</th><th>Identity (%)</th><th>E-value</th>
+    <th>Description</th><th>Sequence</th>
   </tr>
   {% for item in results %}
   <tr>
@@ -101,8 +68,7 @@
     <td>{{ item.evalue }}</td>
     <td>{{ item.description }}</td>
     <td>
-      <details>
-        <summary>View Sequence</summary>
+      <details><summary>View Sequence</summary>
         <textarea rows="8" cols="80" readonly>{{ item.sequence | trim }}</textarea>
       </details>
     </td>
@@ -113,40 +79,93 @@
 <p style="color:red;">No Results Yet. Please enter a DNA sequence and run BLAST.</p>
 {% endif %}
 
-<div style="position:fixed; bottom:20px; left:50%; transform:translateX(-50%);">
-  <a href="/blastinfo">
-    <button style="background-color:purple; color:white; padding:10px 25px; font-size:18px; margin-right:30px;">Prev Page</button>
-  </a>
-  <a href="/blastp">
-    <button style="background-color:purple; color:white; padding:10px 25px; font-size:18px;">Next Page</button>
-  </a>
+<div style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);">
+  <a href="/blastinfo"><button style="background-color:purple;color:white;padding:10px 25px;font-size:18px;margin-right:30px;">Prev Page</button></a>
+  <a href="/blastp"><button style="background-color:purple;color:white;padding:10px 25px;font-size:18px;">Next Page</button></a>
 </div>
 
 <script>
-  // bfcache fix: back button se aane par fresh reload
-  window.addEventListener("pageshow", function(event) {
-    if (event.persisted) {
-      window.location.reload();
+var _dnaAnimId = null;
+
+window.addEventListener("pageshow", function(e) {
+  if (e.persisted) { window.location.reload(); }
+  stopLoader();
+});
+
+document.getElementById("blastForm").addEventListener("submit", function(e) {
+  e.preventDefault();
+  var form = this;
+  showDNALoader();
+  setTimeout(function() { form.submit(); }, 3500);
+});
+
+function showDNALoader() {
+  document.getElementById("loader").style.display = "flex";
+  _startDNA();
+}
+
+function stopLoader() {
+  if (_dnaAnimId) { cancelAnimationFrame(_dnaAnimId); _dnaAnimId = null; }
+  var loader = document.getElementById("loader");
+  if (loader) loader.style.display = "none";
+  var cv = document.getElementById("dna-canvas");
+  if (cv) cv.getContext("2d").clearRect(0, 0, cv.width, cv.height);
+}
+
+function _startDNA() {
+  var cv=document.getElementById("dna-canvas"),ctx=cv.getContext("2d"),W=cv.width,H=cv.height,t=0;
+  var BASES={A:{c:"#e03060"},T:{c:"#0878c8"},G:{c:"#0a9e5c"},C:{c:"#c07800"}};
+  var PAIRS=[["A","T"],["C","G"],["T","A"],["G","C"],["A","T"],["G","C"],["C","G"],["T","A"],["G","C"],["A","T"],["T","A"],["C","G"],["G","C"],["A","T"],["C","G"],["T","A"],["G","C"],["A","T"],["C","G"],["T","A"]];
+  var N=20,TURNS=2.5,AMP=105,MX=42,SP=(W-MX*2)/(N-1);
+
+  function sphere(x,y,r,col,al){
+    if(r<3)return;
+    ctx.save();ctx.globalAlpha=al;
+    ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();
+    ctx.beginPath();ctx.arc(x-r*.3,y-r*.32,r*.44,0,Math.PI*2);
+    var g=ctx.createRadialGradient(x-r*.3,y-r*.32,0,x-r*.3,y-r*.32,r*.44);
+    g.addColorStop(0,"rgba(255,255,255,.72)");g.addColorStop(1,"rgba(255,255,255,0)");
+    ctx.fillStyle=g;ctx.fill();ctx.restore();
+  }
+
+  function frame(){
+    ctx.clearRect(0,0,W,H);
+    var s1=[],s2=[];
+    for(var i=0;i<N;i++){
+      var px=MX+i*SP,ang=(i/(N-1))*Math.PI*2*TURNS+t,p=PAIRS[i%PAIRS.length];
+      s1.push({x:px,y:H/2+Math.sin(ang)*AMP,         d:Math.cos(ang),         lbl:p[0],col:BASES[p[0]].c});
+      s2.push({x:px,y:H/2+Math.sin(ang+Math.PI)*AMP, d:Math.cos(ang+Math.PI), lbl:p[1],col:BASES[p[1]].c});
     }
-    // Loader hamesha band rakho fresh load par
-    document.getElementById("loader").style.display = "none";
-  });
-
-  // Form submit — loader dikhao, minimum 3.5 sec baad submit karo
-  document.getElementById("blastForm").addEventListener("submit", function(e) {
-    e.preventDefault(); // Form ko rokke rakhو
-
-    var form = this;
-
-    // Loader dikhaо
-    document.getElementById("loader").style.display = "flex";
-
-    // 3.5 second baad form submit karo
-    setTimeout(function() {
-      form.submit();
-    }, 3500);
-  });
+    ctx.save();ctx.setLineDash([5,5]);
+    for(var i=0;i<N;i++){
+      var al=0.12+Math.abs(s1[i].d)*.2;
+      ctx.strokeStyle="rgba(80,100,180,"+al.toFixed(2)+")";ctx.lineWidth=1.2;
+      ctx.beginPath();ctx.moveTo(s1[i].x,s1[i].y);ctx.lineTo(s2[i].x,s2[i].y);ctx.stroke();
+    }
+    ctx.setLineDash([]);ctx.restore();
+    [[s1,"rgba(0,150,90,"],[s2,"rgba(20,90,200,"]].forEach(function(p){
+      var str=p[0],bc=p[1];
+      for(var i=0;i<N-1;i++){
+        var pt=str[i],pn=str[i+1],dep=(pt.d+1)/2,al=.25+dep*.6;
+        ctx.strokeStyle=bc+al.toFixed(2)+")";ctx.lineWidth=2.5+dep*2;ctx.lineCap="round";
+        ctx.beginPath();ctx.moveTo(pt.x,pt.y);ctx.lineTo(pn.x,pn.y);ctx.stroke();
+      }
+    });
+    var all=s1.concat(s2);all.sort(function(a,b){return a.d-b.d;});
+    all.forEach(function(b){
+      var r=Math.max(9+b.d*5,5),al=0.55+b.d*.38;
+      sphere(b.x,b.y,r,b.col,al);
+      if(r>7){
+        ctx.save();ctx.globalAlpha=al+.05;ctx.fillStyle="#fff";
+        ctx.font="bold "+Math.round(r*1.05)+"px Courier New";
+        ctx.textAlign="center";ctx.textBaseline="middle";
+        ctx.fillText(b.lbl,b.x,b.y+.5);ctx.restore();
+      }
+    });
+    t+=0.018;_dnaAnimId=requestAnimationFrame(frame);
+  }
+  frame();
+}
 </script>
-
 </body>
 </html>

@@ -90,7 +90,7 @@
   {% for block in alignment_blocks %}
   <div class="alignment-block">
     <pre>Query   {{ "%4d"|format(block.start) }}  {{ block.query }}
-              {{ block.match }}
+              {% for ch in block.match %}{% if ch == "|" %}<span class="match-match">|</span>{% elif ch == "*" %}<span class="match-miss">*</span>{% elif ch == "-" %}<span class="match-gap">-</span>{% else %} {% endif %}{% endfor %}
 Subject {{ "%4d"|format(block.start) }}  {{ block.subject }}</pre>
   </div>
   {% endfor %}
