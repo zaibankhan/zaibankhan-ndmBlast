@@ -25,7 +25,7 @@
   @keyframes blink { 0%,100%{opacity:.3} 50%{opacity:1} }
 </style>
 </head>
-<body style="background-color:lightblue;">
+<body style="background-color:orange;">
 
 <!-- SAME DNA LOADER -->
 <div id="loader">
@@ -52,6 +52,13 @@
 </form>
 
 <p style="color:green;">Database: Local NDM Protein Database</p>
+
+{% if session.get("blast_error") %}
+<div style="background:#ffe0e0;border:2px solid red;border-radius:8px;padding:15px;margin:15px 0;font-size:16px;color:#cc0000;">
+  <b>⚠️ {{ session.get("blast_error") }}</b>
+</div>
+{% endif %}
+
 <p style="color:blue;">Total Results = {{ results|length }}</p>
 
 {% if results %}
