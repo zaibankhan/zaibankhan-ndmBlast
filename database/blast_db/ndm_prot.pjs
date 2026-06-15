@@ -1,0 +1,24 @@
+{
+  "version": "1.2",
+  "dbname": "ndm_prot",
+  "dbtype": "Protein",
+  "db-version": 5,
+  "description": "database/NDM_proteins.fasta",
+  "number-of-letters": 25924,
+  "number-of-sequences": 96,
+  "last-updated": "2026-06-16T00:09:00",
+  "number-of-volumes": 1,
+  "bytes-total": 1034623,
+  "bytes-to-cache": 26905,
+  "files": [
+    "ndm_prot.pdb",
+    "ndm_prot.phr",
+    "ndm_prot.pin",
+    "ndm_prot.pog",
+    "ndm_prot.pos",
+    "ndm_prot.pot",
+    "ndm_prot.psq",
+    "ndm_prot.ptf",
+    "ndm_prot.pto"
+  ]
+}
