@@ -15,11 +15,16 @@ DATABASE_FIXED      = "database/ndm_new.db"
 PROTEIN_ONLY_CHARS = set("RDEQHILKMFPWYV")
 
 
+def clean_id(raw_id):
+    """Remove backslashes and extra spaces from sequence IDs"""
+    return raw_id.replace("\\", "").strip()
+
+
 def load_database(file_path):
     records = []
     for record in SeqIO.parse(file_path, "fasta"):
         records.append({
-            "id":          record.id,
+            "id":          clean_id(record.id),        # FIX: backslash removed
             "description": record.description,
             "sequence":    str(record.seq).upper()
         })
@@ -126,14 +131,12 @@ def blastinfo():
 
 @app.route("/blastn")
 def blastn():
-    # Fresh page load — purana error clear karo
     session["blast_error"]    = ""
     session["blastn_results"] = []
     return render_template("BlastN.html", results=[])
 
 @app.route("/blastp")
 def blastp():
-    # Fresh page load — purana error clear karo
     session["blast_error"]    = ""
     session["blastp_results"] = []
     return render_template("BlastP.html", results=[])
@@ -147,7 +150,6 @@ def runblastn():
     session["blastn_results"] = []
     session["blast_error"]    = ""
 
-    # Protein sequence BlastN mein dali?
     if is_protein_sequence(raw):
         session["blastn_query"]   = ""
         session["query_sequence"] = ""
@@ -180,7 +182,6 @@ def runblastp():
     session["blastp_results"] = []
     session["blast_error"]    = ""
 
-    # DNA sequence BlastP mein dali?
     if is_dna_sequence(raw):
         session["blastp_query"]   = ""
         session["query_sequence"] = ""
@@ -216,8 +217,10 @@ def blastn_results():
     return render_template("BlastN.html", results=results)
 
 
-@app.route("/details/<name>")
+# FIX: <path:name> allows slashes/dots in variant IDs like NG_080783.1
+@app.route("/details/<path:name>")
 def details(name):
+    name = clean_id(name)   # FIX: extra safety — clean backslash if any
     blast_type = session.get("last_blast", "p")
 
     if blast_type == "n":
