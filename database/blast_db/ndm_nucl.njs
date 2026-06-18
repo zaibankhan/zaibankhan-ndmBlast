@@ -6,9 +6,9 @@
   "description": "database/NDM_genes.fasta",
   "number-of-letters": 83148,
   "number-of-sequences": 97,
-  "last-updated": "2026-06-16T00:08:00",
+  "last-updated": "2026-06-18T10:17:00",
   "number-of-volumes": 1,
-  "bytes-total": 1041765,
+  "bytes-total": 1029941,
   "bytes-to-cache": 22137,
   "files": [
     "ndm_nucl.ndb",
