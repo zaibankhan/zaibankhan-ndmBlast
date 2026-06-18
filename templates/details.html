@@ -66,14 +66,12 @@
 </a>
 {% endif %}
 
-{% if blast_type == "n" %}
 <br><br>
-<a href="https://www.ncbi.nlm.nih.gov/nuccore/{{ record.id }}" target="_blank">
+<a href="https://pubmed.ncbi.nlm.nih.gov/?term={{ record.id }}" target="_blank">
   <button style="background-color:#1a6e9c; color:white; padding:8px 20px; font-size:15px; border-radius:5px; border:none; cursor:pointer;">
     View on NCBI
   </button>
 </a>
-{% endif %}
 
 <h2>Isolation Source</h2>
 <p>{{ record.dna_name or "—" }}</p>
