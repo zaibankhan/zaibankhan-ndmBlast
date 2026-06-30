@@ -1,6 +1,36 @@
 <HTML>
 <head>
 <tittle>(website topic)</tittle>
+<style>
+  /* 3D hover effect with glow */
+  .nav-btn {
+    background-color: purple;
+    color: white;
+    padding: 10px 25px;
+    font-size: 18px;
+    border: none;
+    cursor: pointer;
+    border-radius: 6px;
+    transform: perspective(600px) translateZ(0);
+    box-shadow: 0 6px 0 #4a004a, 0 8px 10px rgba(0,0,0,0.3);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    position: relative;
+    top: 0;
+  }
+  .nav-btn:hover {
+    transform: perspective(600px) translateZ(18px) translateY(-4px);
+    box-shadow: 0 12px 0 #4a004a,
+                0 16px 20px rgba(0,0,0,0.35),
+                0 0 18px 6px rgba(180,0,255,0.45),
+                0 18px 30px rgba(180,0,255,0.25);
+  }
+  .nav-btn:active {
+    transform: perspective(600px) translateZ(4px) translateY(2px);
+    box-shadow: 0 2px 0 #4a004a,
+                0 4px 6px rgba(0,0,0,0.2),
+                0 0 8px 3px rgba(180,0,255,0.3);
+  }
+</style>
 </head>
 <body style="background-image:url(begd.png); background-size:cover; background-repeat:no-repeat;background-position:center; background-attachment:fixed; height:100vh; margin:0;">
 <hr style="border:2px solid white;">
@@ -9,11 +39,11 @@
 <hr style="border: 2px solid black; width:90%; margin:0 auto 20px auto;">
 <div style="display:flex;justify-content:space-evenly; margin-top:30px;">
 
-<a href="/"><button style="background-color:purple; color:white; padding:10px 25px; font-size:18px;">Home</button></a> 
+<a href="/"><button class="nav-btn">Home</button></a> 
 
-<a href="/blastn"><button style="background-color:purple; color:white; padding:10px 25px; font-size:18px;">BLASTn-NDM</button></a>
+<a href="/blastn"><button class="nav-btn">BLASTn-NDM</button></a>
 
-<a href="/blastp"><button style="background-color:purple; color:white; padding:10px 25px; font-size:18px;">BLASTp-NDM</button></a>
+<a href="/blastp"><button class="nav-btn">BLASTp-NDM</button></a>
 
 </div>
 <br><br>
@@ -21,7 +51,7 @@
 <div style="position:fixed; bottom:20px; left:50%; transform:translateX(-50%);">
 
 <a href="/blastn">
-<button style="background-color:purple; color:white; padding:10px 25px; font-size:18px;">Next Page</button>
+<button class="nav-btn">Next Page</button>
 <a>
 </div>
 </body>
