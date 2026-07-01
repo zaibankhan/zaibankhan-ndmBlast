@@ -47,9 +47,9 @@
 <p style="display:flex; align-items:center; gap:12px;">
   {{ record.id }}
   {% if blast_type == "p" %}
-  <a href="https://www.rcsb.org/search?request=%7B%22query%22%3A%7B%22type%22%3A%22terminal%22%2C%22service%22%3A%22full_text%22%2C%22parameters%22%3A%7B%22value%22%3A%22{{ record.id }}%22%7D%7D%2C%22return_type%22%3A%22entry%22%7D" target="_blank">
-    <button style="background-color:#2c6e49; color:white; padding:5px 14px; font-size:13px; border-radius:5px; border:none; cursor:pointer;">
-      View on PDB
+  <a href="https://www.uniprot.org/uniprotkb?query={{ record.id }}" target="_blank">
+    <button style="background-color:#003f88; color:white; padding:5px 14px; font-size:13px; border-radius:5px; border:none; cursor:pointer;">
+      View on UniProt
     </button>
   </a>
   {% endif %}
@@ -72,6 +72,8 @@
     View on NCBI
   </button>
 </a>
+
+
 
 <h2>Isolation Source</h2>
 <p>{{ record.dna_name or "—" }}</p>
