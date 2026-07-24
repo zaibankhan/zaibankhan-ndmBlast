@@ -1,33 +1,138 @@
-## Overview
+# 🧬 NDM-BLAST
 
-This project is a local web-based bioinformatics application developed using Python and Flask.
+A local web-based bioinformatics application developed using **Python, Flask, HTML, CSS, SQLite, and Biopython** for identifying **NDM (New Delhi Metallo-β-lactamase)** variants using nucleotide and protein sequence analysis.
 
-The application identifies NDM (New Delhi Metallo-beta-lactamase) variants using nucleotide (BLASTN) and protein (BLASTP) sequence analysis.
+---
 
-The project also stores NDM variant information in a local SQL database.
+## 📌 About the Project
 
-## Technologies Used
+NDM-BLAST is a bioinformatics web application that allows users to search unknown DNA or protein sequences against a local NDM variant database.
 
-- Python
-- Flask
-- HTML
-- CSS
-- SQLite
-- Biopython
+The project provides an easy-to-use interface for sequence analysis and displays detailed information about matched NDM variants.
 
-## Features
+This project was developed as part of my **M.Sc. Bioinformatics** coursework at **Jamia Millia Islamia, New Delhi**.
 
-- BLASTN Search
-- BLASTP Search
-- Local NDM Database
-- Variant Information
-- Sequence Search
-- Similarity Calculation
+---
 
-## Author
+## ✨ Features
 
-Mohd Zaiban Khan
+- 🔬 BLASTN (Nucleotide Sequence Search)
+- 🧪 BLASTP (Protein Sequence Search)
+- 🗂 Local NDM Variant Database
+- 📊 Similarity Score Calculation
+- 📈 E-value Display
+- 📝 Variant Details Page
+- 🌐 User-friendly Web Interface
+- ⚡ Fast Local Sequence Search
 
-M.Sc Bioinformatics
+---
 
-Jamia Millia Islamia
+## 🛠 Technologies Used
+
+| Technology | Purpose |
+|------------|----------|
+| Python | Backend Programming |
+| Flask | Web Framework |
+| HTML | Web Pages |
+| CSS | User Interface |
+| SQLite | Local Database |
+| Biopython | Sequence Analysis |
+| SQL | Data Management |
+
+---
+
+## 📂 Project Structure
+
+```text
+ndmBlast/
+│
+├── database/
+├── templates/
+├── static/
+├── app.py
+├── insert_all.py
+├── requirements.txt
+└── README.md
+```
+
+---
+
+## 🚀 How to Run
+
+### Clone Repository
+
+```bash
+git clone https://github.com/zaibankhan12345/zaibankhan-ndmBlast.git
+```
+
+### Move into Project Folder
+
+```bash
+cd zaibankhan-ndmBlast
+```
+
+### Install Required Packages
+
+```bash
+pip install -r requirements.txt
+```
+
+### Run the Application
+
+```bash
+python app.py
+```
+
+### Open Browser
+
+```text
+http://127.0.0.1:5000
+```
+
+---
+
+## 📷 Project Screenshots
+
+### Home Page
+
+*(Upload your homepage screenshot here.)*
+
+### BLASTN Result
+
+*(Upload your BLASTN result screenshot here.)*
+
+### BLASTP Result
+
+*(Upload your BLASTP result screenshot here.)*
+
+---
+
+## 🎯 Future Improvements
+
+- Multiple Sequence Alignment
+- Download Results (PDF/Excel)
+- Better UI Design
+- Advanced Search Filters
+- Cloud Deployment
+- Public Database Integration
+- User Authentication
+
+---
+
+## 👨‍💻 Developer
+
+**Mohd Zaiban Khan**
+
+M.Sc. Bioinformatics  
+Jamia Millia Islamia  
+New Delhi, India
+
+---
+
+## 📧 Contact
+
+Email: zaibankhan12345@gmail.com
+
+---
+
+## ⭐ If you found this project useful, please give it a Star!
