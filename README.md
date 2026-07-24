@@ -95,15 +95,15 @@ http://127.0.0.1:5000
 
 ### Home Page
 
-*(Upload your homepage screenshot here.)*
+![Home Page](screenshots/homepage.png)
 
 ### BLASTN Result
 
-*(Upload your BLASTN result screenshot here.)*
+![BLASTN Result](screenshots/blastn-result.png)
 
 ### BLASTP Result
 
-*(Upload your BLASTP result screenshot here.)*
+![BLASTP Result](screenshots/blastp-result.png)
 
 ---
 
