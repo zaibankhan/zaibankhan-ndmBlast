@@ -1,12 +1,12 @@
 from Bio import SeqIO
 import sqlite3
 
-conn = sqlite3.connect("database/ndm_fixed.db")
+conn = sqlite3.connect("database/ndm_new.db")
 cursor = conn.cursor()
 
 # NUCLEOTIDE DATA — ndm_nucleotide table mein
 n_count = 0
-for record in SeqIO.parse("database/NUCLEOTIDE_ndmfinal.txt", "fasta"):
+for record in SeqIO.parse("database/NDM_genes.fasta", "fasta"):
     try:
         cursor.execute(
             "INSERT OR REPLACE INTO ndm_nucleotide VALUES (?, ?, ?)",
@@ -20,7 +20,7 @@ print(f"Nucleotide records inserted: {n_count}")
 
 # PROTEIN DATA — ndm_protein table mein
 p_count = 0
-for record in SeqIO.parse("database/PROTEIN_ndmfinal.txt", "fasta"):
+for record in SeqIO.parse("database/NDM_proteins.fasta", "fasta"):
     try:
         cursor.execute(
             "INSERT OR REPLACE INTO ndm_protein VALUES (?, ?, ?)",
@@ -34,4 +34,4 @@ print(f"Protein records inserted: {p_count}")
 
 conn.commit()
 conn.close()
-print("Done! ndm_fixed.db ready.")
+print("Done! ndm_new.db ready.")

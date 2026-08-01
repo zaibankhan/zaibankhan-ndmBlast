@@ -38,7 +38,7 @@
 </style>
 </head>
 
-<body style="background-color:lightblue;">
+<body style="background-color:#6BAED6;">
 
 <h1>{{ record.id }}</h1>
 <hr>
@@ -68,14 +68,17 @@
 <p>{{ record.host_bacteria or "—" }}</p>
 
 <h2>Publication</h2>
-<p>{{ record.publication or "—" }}</p>
-{% if record.publication %}
-<a href="{{ record.publication }}" target="_blank">
-  <button>Open Research Paper</button>
+
+{% if publication_links %}
+<a href="{{ url_for('publications', name=record.id) }}" target="_blank">
+  <button style="background-color:#6a1b9a; color:white; padding:8px 20px; font-size:15px; border-radius:5px; border:none; cursor:pointer; margin-bottom:10px;">
+    Publication database ({{ publication_links|length }})
+  </button>
 </a>
+{% else %}
+<p>—</p>
 {% endif %}
 
-<br><br>
 {% if blast_type == "p" %}
 <a href="https://www.ncbi.nlm.nih.gov/protein/?term={{ record.id }}+NDM" target="_blank">
   <button style="background-color:#1a6e9c; color:white; padding:8px 20px; font-size:15px; border-radius:5px; border:none; cursor:pointer;">

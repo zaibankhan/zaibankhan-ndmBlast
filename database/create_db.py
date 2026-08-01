@@ -1,6 +1,6 @@
 import sqlite3
 
-conn = sqlite3.connect("database/ndm_fixed.db")
+conn = sqlite3.connect("database/ndm_new.db")
 cursor = conn.cursor()
 
 # Nucleotide sequences ke liye alag table

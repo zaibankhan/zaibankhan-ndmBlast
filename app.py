@@ -3,6 +3,8 @@ from Bio import SeqIO
 import re
 import sqlite3
 import math
+import json
+import os
 
 
 # ── NDM VARIANT STRUCTURE LINKS ───────────────────────────────────────────────
@@ -55,6 +57,14 @@ app.secret_key = "ndm123"
 DATABASE_NUCLEOTIDE = "database/NDM_genes.fasta"
 DATABASE_PROTEIN    = "database/NDM_proteins.fasta"
 DATABASE_FIXED      = "database/ndm_new.db"
+
+# NDM variant ke DOI/publication links — jis NDM ki jitni links hain,
+# sab list mein aayengi (excel se banaya gaya hai)
+PUBLICATIONS_FILE = "database/ndm_publications.json"
+NDM_PUBLICATIONS = {}
+if os.path.exists(PUBLICATIONS_FILE):
+    with open(PUBLICATIONS_FILE, "r", encoding="utf-8") as f:
+        NDM_PUBLICATIONS = json.load(f)
 
 # Protein-unique chars — ye DNA mein kabhi nahi aate
 PROTEIN_ONLY_CHARS = set("RDEQHILKMFPWYV")
@@ -307,6 +317,7 @@ def details(name):
 
     alphafold_url = NDM_ALPHAFOLD_LINKS.get(name, "")
     pdb_url       = NDM_PDB_LINKS.get(name, "")
+    publication_links = NDM_PUBLICATIONS.get(name, [])
 
     return render_template(
         "details.html",
@@ -321,6 +332,17 @@ def details(name):
         hit=hit,
         alphafold_url=alphafold_url,
         pdb_url=pdb_url,
+        publication_links=publication_links,
+    )
+
+
+@app.route("/publications/<name>")
+def publications(name):
+    links = NDM_PUBLICATIONS.get(name, [])
+    return render_template(
+        "publications.html",
+        variant_id=name,
+        links=links,
     )
 
 
