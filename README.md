@@ -95,15 +95,15 @@ http://127.0.0.1:5000
 
 ### Home Page
 
-![Home Page](screenshots/homepage.png)
+![Home Page](Users\HP\OneDrive\Desktop\projecthomepage.png)
 
 ### BLASTN Result
 
-![BLASTN Result](screenshots/blastn-result.png)
+![BLASTN Result](Users\HP\OneDrive\Desktop\projectblastn-result.png)
 
 ### BLASTP Result
 
-![BLASTP Result](screenshots/blastp-result.png)
+![BLASTP Result](Users\HP\OneDrive\Desktop\project\blastp-result.png)
 
 ---
 
