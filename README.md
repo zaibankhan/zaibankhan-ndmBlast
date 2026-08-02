@@ -99,11 +99,11 @@ http://127.0.0.1:5000
 
 ### BLASTN Result
 
-![BLASTN Result](Users\HP\OneDrive\Desktop\projectblastn-result.png)
+![BLASTN Result](Users\HP\OneDrive\Desktop\project\blastn-result.png)
 
 ### BLASTP Result
 
-![BLASTP Result](blastp-result.png)
+![BLASTP Result](Users\HP\OneDrive\Desktop\project\blastp-result.png)
 
 ---
 
