@@ -95,7 +95,7 @@ http://127.0.0.1:5000
 
 ### Home Page
 
-![Home Page](Users\HP\OneDrive\Desktop\projecthomepage.png)
+![Home Page](Users\HP\OneDrive\Desktop\project\homepage.png)
 
 ### BLASTN Result
 
@@ -103,7 +103,7 @@ http://127.0.0.1:5000
 
 ### BLASTP Result
 
-![BLASTP Result](Users\HP\OneDrive\Desktop\project\blastp-result.png)
+![BLASTP Result](blastp-result.png)
 
 ---
 
