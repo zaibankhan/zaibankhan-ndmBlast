@@ -1,76 +1,170 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<title>{{ record.id }}</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ record.id }} &mdash; NDM-BLAST</title>
 <style>
-  body { font-family: Arial, sans-serif; }
+  :root {
+    --bg: #f4f6fa;
+    --card: #ffffff;
+    --ink: #1f2937;
+    --muted: #6b7280;
+    --brand: #1f4e78;
+    --accent: #0e9f8f;
+    --accent-soft: #e6f6f4;
+    --line: #e4e7ee;
+    --shadow: 0 10px 30px rgba(20, 40, 70, 0.10);
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", -apple-system, Arial, sans-serif; background: var(--bg); color: var(--ink); }
 
-  pre {
-    background: #f4f4f4;
-    padding: 12px 16px;
-    border-radius: 6px;
-    overflow-x: auto;
-    font-family: "Courier New", Courier, monospace;
-    font-size: 13px;
-    line-height: 1.8;
-    white-space: pre;
-    word-break: keep-all;
-  }
-  .alignment-block {
-    margin-bottom: 16px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    overflow: hidden;
-  }
+  .topbar { background: var(--card); border-bottom: 1px solid var(--line); padding: 14px 32px; display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-mark { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, var(--brand), var(--accent)); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; }
+  .brand-name { font-weight: 700; font-size: 18px; color: var(--brand); }
+  .brand-sub { font-size: 12px; color: var(--muted); }
+  .share-btn { background: #fff; border: 1px solid var(--line); color: var(--ink); padding: 9px 18px; border-radius: 9px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .18s ease; }
+  .share-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-  /* BLAST stats box */
-  .blast-stats {
-    background: #e8f4e8;
-    border: 1px solid #4caf50;
-    border-radius: 8px;
-    padding: 14px 20px;
-    margin: 20px 0;
-    font-size: 15px;
-  }
-  .blast-stats table { border-collapse: collapse; }
-  .blast-stats td { padding: 4px 20px 4px 0; }
-  .blast-stats td:first-child { font-weight: bold; color: #333; }
-  .blast-stats td:last-child { color: #1a6e1a; font-weight: bold; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 32px 24px 60px; }
 
-  /* 3D animated buttons — used by Share, Publication database, View on NCBI, AlphaFold, PDB */
-  .btn-3d {
-    color: white;
-    padding: 8px 20px;
-    font-size: 15px;
-    font-family: Arial, sans-serif;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    transform: perspective(600px) translateZ(0);
-    box-shadow: 0 6px 0 var(--btn-shadow, #333), 0 8px 10px rgba(0,0,0,0.3);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-    position: relative;
-    top: 0;
+  .page-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+  .page-title { font-size: 30px; font-weight: 800; color: var(--brand); margin: 0; letter-spacing: -0.3px; }
+  .head-links { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px; text-decoration: none;
+    border: none; border-radius: 9px; padding: 9px 16px; font-size: 13px; font-weight: 700;
+    color: #fff; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.12);
   }
-  .btn-3d:hover {
-    transform: perspective(600px) translateZ(18px) translateY(-4px);
-    box-shadow: 0 12px 0 var(--btn-shadow, #333),
-                0 16px 20px rgba(0,0,0,0.35),
-                0 0 18px 6px var(--btn-glow, rgba(255,255,255,0.4)),
-                0 18px 30px var(--btn-glow, rgba(255,255,255,0.25));
-  }
-  .btn-3d:active {
-    transform: perspective(600px) translateZ(4px) translateY(2px);
-    box-shadow: 0 2px 0 var(--btn-shadow, #333),
-                0 4px 6px rgba(0,0,0,0.2),
-                0 0 8px 3px var(--btn-glow, rgba(255,255,255,0.3));
-  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn.alpha { background: #1565c0; }
+  .btn.pdb   { background: #1a7a5a; }
+  .btn.pub   { background: #6a4fa3; }
+  .btn.ncbi  { background: #1a6e9c; }
+  .btn.ghost { background: #fff; color: var(--brand); border: 1px solid var(--line); box-shadow: none; }
+  .btn.ghost:hover { border-color: var(--brand); }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; margin-bottom: 22px; }
+  .card h2 { margin: 0 0 14px; font-size: 17px; color: var(--brand); border-bottom: 2px solid var(--accent-soft); padding-bottom: 8px; letter-spacing: 0.2px; }
+
+  .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; }
+  .meta-item .k { font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); font-weight: 700; margin-bottom: 4px; }
+  .meta-item .v { font-size: 15px; font-weight: 600; color: var(--ink); }
+
+  .stats { display: flex; flex-wrap: wrap; gap: 16px; }
+  .stat { flex: 1 1 120px; background: #f7fafc; border: 1px solid var(--line); border-radius: 12px; padding: 16px; text-align: center; }
+  .stat .s-val { font-size: 24px; font-weight: 800; color: var(--brand); }
+  .stat .s-key { font-size: 12px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  pre.aln { background: #0f2233; color: #e8edf3; padding: 16px 18px; border-radius: 10px; overflow-x: auto; font-family: "Consolas", "Courier New", monospace; font-size: 13px; line-height: 1.9; white-space: pre; }
+  .aln-block { margin-bottom: 14px; }
+  .aln-block:last-child { margin-bottom: 0; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; font-size: 13px; color: var(--muted); }
+  .legend span .lg { font-family: "Consolas", monospace; font-weight: 700; }
+
+  .seq-card { word-break: break-all; font-family: "Consolas", monospace; font-size: 13px; line-height: 1.6; }
+
+  @media (max-width: 640px) { .page-title { font-size: 24px; } }
 </style>
 </head>
+<body>
 
-<body style="background-color:#6BAED6;">
-<button id="shareBtn" onclick="shareThisPage()" class="btn-3d" style="position:fixed; top:15px; right:20px; background-color:#2c6e49; z-index:1000; --btn-shadow:#184a30; --btn-glow:rgba(46,204,113,0.55);">
-  🔗 Share
-</button>
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark">NDM</div>
+    <div>
+      <div class="brand-name">NDM-BLAST</div>
+      <div class="brand-sub">Variant Details</div>
+    </div>
+  </div>
+  <button id="shareBtn" class="share-btn" onclick="shareThisPage()">Share</button>
+</div>
+
+<div class="wrap">
+  <div class="page-head">
+    <h1 class="page-title">{{ record.id }}</h1>
+    <div class="head-links">
+      {% if blast_type == "p" %}
+        {% if alphafold_url %}
+        <a class="btn alpha" href="{{ alphafold_url }}" target="_blank">&#128391; AlphaFold</a>
+        {% endif %}
+        {% if pdb_url %}
+        <a class="btn pdb" href="{{ pdb_url }}" target="_blank">&#129516; PDB</a>
+        {% endif %}
+      {% endif %}
+      {% if publication_links %}
+      <a class="btn pub" href="{{ url_for('publications', name=record.id) }}" target="_blank">
+        &#128221; Publications ({{ publication_links|length }})
+      </a>
+      {% endif %}
+      {% if blast_type == "p" %}
+      <a class="btn ncbi" href="https://www.ncbi.nlm.nih.gov/protein/?term={{ record.id }}+NDM" target="_blank">View on NCBI</a>
+      {% else %}
+      <a class="btn ncbi" href="https://www.ncbi.nlm.nih.gov/nuccore/?term={{ record.id }}" target="_blank">View on NCBI</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Variant Information</h2>
+    <div class="meta-grid">
+      <div class="meta-item"><div class="k">NDM Variant</div><div class="v">{{ record.id }}</div></div>
+      <div class="meta-item"><div class="k">Bacterial Species</div><div class="v">{{ record.host_bacteria or "—" }}</div></div>
+      <div class="meta-item"><div class="k">Isolation Source</div><div class="v">{{ record.dna_name or "—" }}</div></div>
+      <div class="meta-item"><div class="k">Country of Isolation</div><div class="v">{{ record.country or "—" }}</div></div>
+      <div class="meta-item"><div class="k">Detection Technique</div><div class="v">{{ record.detection_technique or "N/A" }}</div></div>
+    </div>
+  </div>
+
+  {% if hit %}
+  <div class="card">
+    <h2>BLAST Alignment Statistics</h2>
+    <div class="stats">
+      <div class="stat"><div class="s-val">{{ hit.similarity }}%</div><div class="s-key">Identity</div></div>
+      <div class="stat"><div class="s-val">{{ hit.evalue }}</div><div class="s-key">E-value</div></div>
+      <div class="stat"><div class="s-val">{{ query_length }}</div><div class="s-key">Query Length</div></div>
+      <div class="stat"><div class="s-val">{{ subject_length }}</div><div class="s-key">Subject Length</div></div>
+      {% if hit.aln_len %}<div class="stat"><div class="s-val">{{ hit.aln_len }}</div><div class="s-key">Alignment Length</div></div>{% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="card">
+    <h2>Sequence Lengths</h2>
+    <div class="stats">
+      <div class="stat"><div class="s-val">{{ query_length }}</div><div class="s-key">Query Length</div></div>
+      <div class="stat"><div class="s-val">{{ subject_length }}</div><div class="s-key">Subject Length</div></div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2>Pairwise Alignment</h2>
+    {% if alignment_blocks %}
+      {% for block in alignment_blocks %}
+      <div class="aln-block">
+        <pre class="aln">Query   {{ "%4d"|format(block.start) }}  {{ block.query }}
+              {{ block.match }}
+Subject {{ "%4d"|format(block.start) }}  {{ block.subject }}</pre>
+      </div>
+      {% endfor %}
+      <div class="legend">
+        <span><span class="lg" style="color:#2ecc8f;">|</span> = Match</span>
+        <span><span class="lg" style="color:#f0b429;">*</span> = Mismatch</span>
+        <span><span class="lg" style="color:#94a3b8;">-</span> = Gap</span>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Full Sequence</h2>
+    <div class="seq-card">{{ subject_seq }}</div>
+  </div>
+</div>
+
 <script>
 function shareThisPage() {
   var url = window.location.href;
@@ -79,116 +173,11 @@ function shareThisPage() {
   } else {
     navigator.clipboard.writeText(url).then(function() {
       var btn = document.getElementById("shareBtn");
-      var original = btn.innerHTML;
-      btn.innerHTML = "✅ Link Copied!";
-      setTimeout(function(){ btn.innerHTML = original; }, 1800);
+      btn.textContent = "Link Copied!";
+      setTimeout(function(){ btn.textContent = "Share"; }, 1800);
     });
   }
 }
 </script>
-
-
-<h1>{{ record.id }}</h1>
-<hr>
-
-<h2>NDM Variant</h2>
-<p style="display:flex; align-items:center; gap:12px;">
-  {{ record.id }}
-  {% if blast_type == "p" %}
-  {% if alphafold_url %}
-  <a href="{{ alphafold_url }}" target="_blank">
-    <button class="btn-3d" style="background-color:#1565c0; padding:6px 16px; font-size:13px; --btn-shadow:#0a3866; --btn-glow:rgba(21,101,192,0.55);">
-      🔷 AlphaFold
-    </button>
-  </a>
-  {% endif %}
-  {% if pdb_url %}
-  <a href="{{ pdb_url }}" target="_blank">
-    <button class="btn-3d" style="background-color:#2c6e49; padding:6px 16px; font-size:13px; --btn-shadow:#184a30; --btn-glow:rgba(46,204,113,0.55);">
-      🧬 PDB
-    </button>
-  </a>
-  {% endif %}
-  {% endif %}
-</p>
-
-<h2>Bacterial Species</h2>
-<p>{{ record.host_bacteria or "—" }}</p>
-
-<h2>Publication</h2>
-
-{% if publication_links %}
-<a href="{{ url_for('publications', name=record.id) }}" target="_blank">
-  <button class="btn-3d" style="background-color:#6a1b9a; margin-bottom:10px; margin-right:20px; --btn-shadow:#3d0f5c; --btn-glow:rgba(180,0,255,0.5);">
-    Publication database ({{ publication_links|length }})
-  </button>
-</a>
-{% else %}
-<p>—</p>
-{% endif %}
-
-{% if blast_type == "p" %}
-<a href="https://www.ncbi.nlm.nih.gov/protein/?term={{ record.id }}+NDM" target="_blank">
-  <button class="btn-3d" style="background-color:#1a6e9c; --btn-shadow:#0c3d52; --btn-glow:rgba(26,110,156,0.55);">
-    View on NCBI
-  </button>
-</a>
-{% else %}
-<a href="https://www.ncbi.nlm.nih.gov/nuccore/?term={{ record.id }}" target="_blank">
-  <button class="btn-3d" style="background-color:#1a6e9c; --btn-shadow:#0c3d52; --btn-glow:rgba(26,110,156,0.55);">
-    View on NCBI
-  </button>
-</a>
-{% endif %}
-
-
-
-<h2>Isolation Source</h2>
-<p>{{ record.dna_name or "—" }}</p>
-
-<h2>Country of Isolation</h2>
-<p>{{ record.country or "—" }}</p>
-
-<h2>Detection Technique</h2>
-<p>{{ record.detection_technique or "N/A" }}</p>
-
-<br>
-
-<!-- BLAST Stats Box -->
-{% if hit %}
-<div class="blast-stats">
-  <b>BLAST Alignment Statistics</b>
-  <table>
-    <tr><td>Identity</td>      <td>{{ hit.similarity }}%</td></tr>
-    <tr><td>E-value</td>       <td>{{ hit.evalue }}</td></tr>
-    <tr><td>Query Length</td>  <td>{{ query_length }}</td></tr>
-    <tr><td>Subject Length</td><td>{{ subject_length }}</td></tr>
-    {% if hit.aln_len %}<tr><td>Alignment Length</td><td>{{ hit.aln_len }}</td></tr>{% endif %}
-  </table>
-</div>
-{% else %}
-<h2>Query Length: {{ query_length }}</h2>
-<h2>Subject Length: {{ subject_length }}</h2>
-{% endif %}
-
-<h2>Alignment</h2>
-
-{% if alignment_blocks %}
-  {% for block in alignment_blocks %}
-  <div class="alignment-block">
-    <pre>Query   {{ "%4d"|format(block.start) }}  {{ block.query }}
-              {% for ch in block.match %}{% if ch == "|" %}<span class="match-match">|</span>{% elif ch == "*" %}<span class="match-miss">*</span>{% elif ch == "-" %}<span class="match-gap">-</span>{% else %} {% endif %}{% endfor %}
-Subject {{ "%4d"|format(block.start) }}  {{ block.subject }}</pre>
-  </div>
-  {% endfor %}
-{% endif %}
-
-<br>
-{% if blast_type == "n" %}
-<button class="btn-3d" onclick="window.location.href='/blastn_results'" style="background-color:#6a1b9a; --btn-shadow:#3d0f5c; --btn-glow:rgba(180,0,255,0.5);">Back To BLAST Results</button>
-{% else %}
-<button class="btn-3d" onclick="window.location.href='/blastp_results'" style="background-color:#6a1b9a; --btn-shadow:#3d0f5c; --btn-glow:rgba(180,0,255,0.5);">Back To BLAST Results</button>
-{% endif %}
-
 </body>
 </html>

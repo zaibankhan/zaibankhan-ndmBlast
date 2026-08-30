@@ -1,91 +1,190 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<title>BlastP</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BLASTp &mdash; NDM-BLAST</title>
 <style>
-  #loader {
-    display: none;
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(255,255,255,0.82);
-    z-index: 9999;
-    justify-content: center;
-    align-items: center;
-    flex-direction: column;
+  :root {
+    --bg: #f4f6fa;
+    --card: #ffffff;
+    --ink: #1f2937;
+    --muted: #6b7280;
+    --brand: #1f4e78;
+    --accent: #0e9f8f;
+    --accent-soft: #e6f6f4;
+    --line: #e4e7ee;
+    --shadow: 0 10px 30px rgba(20, 40, 70, 0.10);
+    --radius: 14px;
+    --danger: #b3261e;
+    --ok: #1a7a5a;
   }
-  #dna-canvas { display: block; }
-  .loading-text {
-    margin-top: 18px;
-    color: #1a5cb5;
-    font-size: 26px;
-    font-weight: bold;
-    font-family: 'Courier New', monospace;
-    letter-spacing: 3px;
-    animation: blink 1.2s infinite;
-  }
-  @keyframes blink { 0%,100%{opacity:.3} 50%{opacity:1} }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", -apple-system, Arial, sans-serif; background: var(--bg); color: var(--ink); }
 
-  /* 3D hover effect with glow */
-  .nav-btn {
-    background-color: purple;
-    color: white;
-    padding: 10px 25px;
-    font-size: 18px;
-    border: none;
-    cursor: pointer;
-    border-radius: 6px;
-    transform: perspective(600px) translateZ(0);
-    box-shadow: 0 6px 0 #4a004a, 0 8px 10px rgba(0,0,0,0.3);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-    position: relative;
-    top: 0;
-  }
-  .nav-btn:hover {
-    transform: perspective(600px) translateZ(18px) translateY(-4px);
-    box-shadow: 0 12px 0 #4a004a,
-                0 16px 20px rgba(0,0,0,0.35),
-                0 0 18px 6px rgba(180,0,255,0.45),
-                0 18px 30px rgba(180,0,255,0.25);
-  }
-  .nav-btn:active {
-    transform: perspective(600px) translateZ(4px) translateY(2px);
-    box-shadow: 0 2px 0 #4a004a,
-                0 4px 6px rgba(0,0,0,0.2),
-                0 0 8px 3px rgba(180,0,255,0.3);
-  }
-  .btn-3d {
-    color: white;
-    padding: 8px 20px;
-    font-size: 15px;
-    font-family: Arial, sans-serif;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    transform: perspective(600px) translateZ(0);
-    box-shadow: 0 6px 0 var(--btn-shadow, #333), 0 8px 10px rgba(0,0,0,0.3);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-    position: relative;
-    top: 0;
-  }
-  .btn-3d:hover {
-    transform: perspective(600px) translateZ(18px) translateY(-4px);
-    box-shadow: 0 12px 0 var(--btn-shadow, #333),
-                0 16px 20px rgba(0,0,0,0.35),
-                0 0 18px 6px var(--btn-glow, rgba(255,255,255,0.4)),
-                0 18px 30px var(--btn-glow, rgba(255,255,255,0.25));
-  }
-  .btn-3d:active {
-    transform: perspective(600px) translateZ(4px) translateY(2px);
-    box-shadow: 0 2px 0 var(--btn-shadow, #333),
-                0 4px 6px rgba(0,0,0,0.2),
-                0 0 8px 3px var(--btn-glow, rgba(255,255,255,0.3));
-  }
+  .topbar { background: var(--card); border-bottom: 1px solid var(--line); padding: 14px 32px; display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-mark { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, var(--brand), var(--accent)); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; }
+  .brand-name { font-weight: 700; font-size: 18px; color: var(--brand); }
+  .brand-sub { font-size: 12px; color: var(--muted); }
+  .share-btn { background: #fff; border: 1px solid var(--line); color: var(--ink); padding: 9px 18px; border-radius: 9px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .18s ease; }
+  .share-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .navbar { background: var(--card); border-bottom: 1px solid var(--line); padding: 10px 32px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .navlink { text-decoration: none; color: var(--muted); padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; transition: all .15s ease; }
+  .navlink:hover { color: var(--brand); background: #f1f5f9; }
+  .navlink.active { color: #fff; background: var(--brand); }
+
+  .wrap { max-width: 960px; margin: 0 auto; padding: 32px 24px 60px; }
+  .page-title { font-size: 26px; font-weight: 700; color: var(--brand); margin: 0 0 6px; }
+  .page-sub { color: var(--muted); margin: 0 0 24px; font-size: 14px; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 26px; }
+  .card + .card { margin-top: 24px; }
+  .label { font-weight: 600; margin-bottom: 8px; display: block; color: var(--ink); }
+  textarea.query { width: 100%; min-height: 170px; border: 1px solid var(--line); border-radius: 10px; padding: 14px; font-size: 14px; font-family: "Consolas", "Courier New", monospace; resize: vertical; line-height: 1.5; color: var(--ink); }
+  textarea.query:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(14,159,143,0.15); }
+
+  .method-group { margin-top: 20px; }
+  .method-label { font-weight: 600; margin-bottom: 10px; display: block; color: var(--ink); }
+  .segment { display: inline-flex; background: #eef1f6; border-radius: 12px; padding: 5px; gap: 5px; border: 1px solid var(--line); flex-wrap: wrap; }
+  .segment label { cursor: pointer; }
+  .segment input { position: absolute; opacity: 0; width: 0; }
+  .segment .seg { display: flex; flex-direction: column; align-items: flex-start; padding: 12px 18px; border-radius: 9px; transition: all .18s ease; border: 1px solid transparent; }
+  .segment .seg .t1 { font-weight: 700; font-size: 14px; color: var(--ink); }
+  .segment .seg .t2 { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .segment input:checked + .seg { background: #fff; border-color: var(--accent); box-shadow: 0 4px 14px rgba(14,159,143,0.18); }
+  .segment input:checked + .seg .t1 { color: var(--accent); }
+  .segment .seg:hover:not(:checked) { background: #fff; }
+
+  .run-row { display: flex; align-items: center; gap: 16px; margin-top: 24px; }
+  .run-btn { background: linear-gradient(135deg, var(--brand), var(--accent)); color: #fff; border: none; padding: 13px 32px; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; box-shadow: 0 6px 18px rgba(31,78,120,0.25); }
+  .run-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(31,78,120,0.32); }
+  .db-note { font-size: 13px; color: var(--ok); display: flex; align-items: center; gap: 6px; }
+
+  .alert { background: #fdecec; border: 1px solid #f5b6b1; color: var(--danger); border-radius: 10px; padding: 14px 18px; margin: 20px 0 0; font-size: 14px; font-weight: 600; }
+  .result-count { margin: 24px 0 12px; font-weight: 700; color: var(--brand); font-size: 15px; }
+  .empty { color: var(--muted); background: var(--card); border: 1px dashed var(--line); border-radius: 12px; padding: 26px; text-align: center; }
+
+  table.results { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.results th { text-align: left; padding: 12px 14px; background: #f1f5f9; color: var(--brand); font-size: 13px; letter-spacing: 0.3px; border-bottom: 2px solid var(--line); }
+  table.results td { padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.results tr:hover td { background: #fafcff; }
+  table.results a { color: var(--brand); font-weight: 700; text-decoration: none; }
+  table.results a:hover { text-decoration: underline; }
+  .var-chip { display: inline-block; background: var(--accent-soft); color: var(--accent); font-weight: 700; padding: 3px 10px; border-radius: 999px; font-size: 12px; }
+  .detail-box { max-height: 160px; overflow: auto; background: #f8fafc; border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-family: "Consolas", monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+
+  footer { text-align: center; padding: 20px; color: var(--muted); font-size: 13px; background: var(--card); border-top: 1px solid var(--line); }
+
+  #loader { display: none; position: fixed; inset: 0; background: rgba(255,255,255,0.86); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; }
+  #dna-canvas { display: block; }
+  .loading-text { margin-top: 18px; color: var(--brand); font-size: 24px; font-weight: 700; font-family: "Courier New", monospace; letter-spacing: 3px; animation: blink 1.2s infinite; }
+  @keyframes blink { 0%,100%{opacity:.3} 50%{opacity:1} }
 </style>
 </head>
+<body>
 
-<body style="background-color:#6BAED6;">
-<button id="shareBtn" onclick="shareThisPage()" class="btn-3d" style="position:fixed; top:15px; right:20px; background-color:#2c6e49; z-index:1000; --btn-shadow:#184a30; --btn-glow:rgba(46,204,113,0.55);">
-  🔗 Share
-</button>
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark">NDM</div>
+    <div>
+      <div class="brand-name">NDM-BLAST</div>
+      <div class="brand-sub">Protein Sequence Search</div>
+    </div>
+  </div>
+  <button id="shareBtn" class="share-btn" onclick="shareThisPage()">Share</button>
+</div>
+
+<div class="navbar">
+  <a class="navlink" href="/">Home</a>
+  <a class="navlink" href="/blastn">BLASTn &mdash; NDM</a>
+  <a class="navlink active" href="/blastp">BLASTp &mdash; NDM</a>
+  <a class="navlink" href="/blastinfo">About</a>
+</div>
+
+<div class="wrap">
+  <h1 class="page-title">BLASTp &mdash; Protein Search</h1>
+  <p class="page-sub">Enter an amino-acid sequence to identify the matching NDM
+  variant from your local database. Only local data is used &mdash; nothing is sent online.</p>
+
+  <div class="card">
+    <form id="blastForm" method="POST" action="/runblastp">
+      <label class="label" for="seq">Enter Protein Sequence</label>
+      <textarea id="seq" name="sequence" class="query" rows="10"></textarea>
+
+      <div class="method-group">
+        <span class="method-label">Alignment Method</span>
+        <div class="segment" role="radiogroup">
+          <label>
+            <input type="radio" name="method" value="sw" {% if method == 'sw' %}checked{% endif %}>
+            <span class="seg">
+              <span class="t1">Local &mdash; Smith-Waterman</span>
+              <span class="t2">Optimal local alignment with gaps (recommended)</span>
+            </span>
+          </label>
+          <label>
+            <input type="radio" name="method" value="simple" {% if method == 'simple' %}checked{% endif %}>
+            <span class="seg">
+              <span class="t1">Global &mdash; Simple</span>
+              <span class="t2">Fast same-offset comparison</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div class="run-row">
+        <button type="submit" class="run-btn">Run BLAST</button>
+        <span class="db-note">&#9679; Database: Local NDM Protein DB</span>
+      </div>
+    </form>
+
+    {% if session.get("blast_error") %}
+    <div class="alert">{{ session.get("blast_error") }}</div>
+    {% endif %}
+  </div>
+
+  <div class="result-count">Total Results: {{ results|length }}</div>
+
+  {% if results %}
+  <div class="card" style="padding:0; overflow:hidden;">
+    <table class="results">
+      <thead>
+        <tr>
+          <th>NDM Variant</th><th>Identity (%)</th><th>E-value</th>
+          <th>Description</th><th>Sequence</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in results %}
+        <tr>
+          <td><a href="/details/{{ item.name }}?type=p&seq={{ query_sequence }}">{{ item.name }}</a></td>
+          <td><span class="var-chip">{{ item.similarity }}%</span></td>
+          <td>{{ item.evalue }}</td>
+          <td>{{ item.description }}</td>
+          <td>
+            <details>
+              <summary>View</summary>
+              <div class="detail-box">{{ item.sequence | trim }}</div>
+            </details>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No results yet. Enter a protein sequence above and run BLAST.</div>
+  {% endif %}
+</div>
+
+<footer>NDM-BLAST &mdash; Local protein analysis. Results are computed only from your uploaded database.</footer>
+
+<div id="loader">
+  <canvas id="dna-canvas" width="680" height="280"></canvas>
+  <div class="loading-text">Running BLAST...</div>
+</div>
+
 <script>
 function shareThisPage() {
   var url = window.location.href;
@@ -94,103 +193,25 @@ function shareThisPage() {
   } else {
     navigator.clipboard.writeText(url).then(function() {
       var btn = document.getElementById("shareBtn");
-      var original = btn.innerHTML;
-      btn.innerHTML = "✅ Link Copied!";
-      setTimeout(function(){ btn.innerHTML = original; }, 1800);
+      btn.textContent = "Link Copied!";
+      setTimeout(function(){ btn.textContent = "Share"; }, 1800);
     });
   }
 }
 </script>
 
-
-<div id="loader">
-  <canvas id="dna-canvas" width="680" height="280"></canvas>
-  <div class="loading-text">Running BLAST...</div>
-</div>
-
-<hr style="border:2px solid white;">
-<h1 style="text-align:center;color:black;margin-bottom:10px;">BlastP Tool</h1>
-<hr style="border:2px solid black;width:90%;margin:0 auto 20px auto;">
-
-<div style="display:flex;justify-content:space-evenly;margin-top:30px;">
-  <a href="/"><button class="nav-btn">Home</button></a>
-  <a href="/blastn"><button class="nav-btn">BLASTn-NDM</button></a>
-  <a href="/blastp"><button class="nav-btn">BLASTp-NDM</button></a>
-</div>
-
-<br><br>
-
-<form id="blastForm" method="POST" action="/runblastp">
-  <p><b>Enter Protein Sequence</b></p>
-  <textarea name="sequence" rows="10" cols="60"></textarea>
-  <br><br>
-  <p><b>Alignment Method:</b></p>
-  <label><input type="radio" name="method" value="sw" {% if method == 'sw' %}checked{% endif %}> Smith-Waterman (Local Alignment) — recommended</label><br>
-  <label><input type="radio" name="method" value="simple" {% if method == 'simple' %}checked{% endif %}> Simple (Global / same-offset comparison)</label>
-  <br><br>
-  <button type="submit">Run Blast</button>
-</form>
-
-<p style="color:green;">Database: Local NDM Protein Database</p>
-
-{% if session.get("blast_error") %}
-<div style="background:#ffe0e0;border:2px solid red;border-radius:8px;padding:15px;margin:15px 0;font-size:16px;color:#cc0000;">
-  <b>{{ session.get("blast_error") }}</b>
-</div>
-{% endif %}
-
-<p style="color:blue;">Total Results = {{ results|length }}</p>
-
-{% if results %}
-<h1 style="color:red;">RESULT FOUND</h1>
-<h2>Top Matches</h2>
-<table border="1" cellpadding="10" cellspacing="0">
-  <tr>
-    <th>NDM Variant</th><th>Identity (%)</th><th>E-value</th>
-    <th>Description</th><th>Sequence</th>
-  </tr>
-  {% for item in results %}
-  <tr>
-    <td><a href="/details/{{ item.name }}?type=p&seq={{ query_sequence }}">{{ item.name }}</a></td>
-    <td>{{ item.similarity }}%</td>
-    <td>{{ item.evalue }}</td>
-    <td>{{ item.description }}</td>
-    <td>
-      <details><summary>View Sequence</summary>
-        <textarea rows="8" cols="80" readonly>{{ item.sequence | trim }}</textarea>
-      </details>
-    </td>
-  </tr>
-  {% endfor %}
-</table>
-{% else %}
-<p style="color:red;">No Results Yet. Please enter a protein sequence and run BLAST.</p>
-{% endif %}
-
-<div style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);">
-  <a href="/blastn"><button class="nav-btn">Prev Page</button></a>
-</div>
-
 <script>
 var _dnaAnimId = null;
-
 window.addEventListener("pageshow", function(e) {
   if (e.persisted) { window.location.reload(); }
   stopLoader();
 });
-
 document.getElementById("blastForm").addEventListener("submit", function(e) {
   e.preventDefault();
-  var form = this;
   showDNALoader();
-  setTimeout(function() { form.submit(); }, 3500);
+  setTimeout(function(){ e.target.submit(); }, 1800);
 });
-
-function showDNALoader() {
-  document.getElementById("loader").style.display = "flex";
-  _startDNA();
-}
-
+function showDNALoader() { document.getElementById("loader").style.display = "flex"; _startDNA(); }
 function stopLoader() {
   if (_dnaAnimId) { cancelAnimationFrame(_dnaAnimId); _dnaAnimId = null; }
   var loader = document.getElementById("loader");
@@ -198,13 +219,11 @@ function stopLoader() {
   var cv = document.getElementById("dna-canvas");
   if (cv) cv.getContext("2d").clearRect(0, 0, cv.width, cv.height);
 }
-
 function _startDNA() {
   var cv=document.getElementById("dna-canvas"),ctx=cv.getContext("2d"),W=cv.width,H=cv.height,t=0;
   var BASES={A:{c:"#e03060"},T:{c:"#0878c8"},G:{c:"#0a9e5c"},C:{c:"#c07800"}};
   var PAIRS=[["A","T"],["C","G"],["T","A"],["G","C"],["A","T"],["G","C"],["C","G"],["T","A"],["G","C"],["A","T"],["T","A"],["C","G"],["G","C"],["A","T"],["C","G"],["T","A"],["G","C"],["A","T"],["C","G"],["T","A"]];
   var N=20,TURNS=2.5,AMP=105,MX=42,SP=(W-MX*2)/(N-1);
-
   function sphere(x,y,r,col,al){
     if(r<3)return;
     ctx.save();ctx.globalAlpha=al;
@@ -214,7 +233,6 @@ function _startDNA() {
     g.addColorStop(0,"rgba(255,255,255,.72)");g.addColorStop(1,"rgba(255,255,255,0)");
     ctx.fillStyle=g;ctx.fill();ctx.restore();
   }
-
   function frame(){
     ctx.clearRect(0,0,W,H);
     var s1=[],s2=[];
