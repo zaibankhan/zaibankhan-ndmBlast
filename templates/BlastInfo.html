@@ -1,0 +1,86 @@
+<html>
+<head>
+<title>BLAST Information</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background-color: #6BAED6;
+    margin: 0;
+    padding: 0 30px 80px 30px;
+    color: #111;
+  }
+  h1 { text-align: center; color: #1a1a1a; }
+  .info-box {
+    background: #ffffff;
+    border: 2px solid #4a90c2;
+    border-radius: 10px;
+    padding: 18px 24px;
+    margin: 20px auto;
+    max-width: 900px;
+    line-height: 1.7;
+    font-size: 16px;
+  }
+  .info-box h2 { color: #1565c0; margin-top: 6px; }
+  .nav-btn {
+    background-color: purple;
+    color: white;
+    padding: 10px 25px;
+    font-size: 18px;
+    border: none;
+    cursor: pointer;
+    border-radius: 6px;
+  }
+</style>
+</head>
+<body>
+<hr style="border:2px solid white;">
+<h1>About BLAST &amp; The Alignment Methods</h1>
+<hr style="border:2px solid black;width:90%;margin:0 auto 20px auto;">
+
+<div style="display:flex;justify-content:space-evenly;margin-top:30px;">
+  <a href="/"><button class="nav-btn">Home</button></a>
+  <a href="/blastn"><button class="nav-btn">BLASTn-NDM</button></a>
+  <a href="/blastp"><button class="nav-btn">BLASTp-NDM</button></a>
+</div>
+
+<div class="info-box">
+  <h2>What is BLAST?</h2>
+  <p>BLAST (Basic Local Alignment Search Tool) is used to compare an unknown
+  query sequence (nucleotide or protein) against a database of known sequences to
+  find the most similar matches. This application compares your sequence against a
+  local database of NDM (New Delhi Metallo-&beta;-lactamase) variants.</p>
+</div>
+
+<div class="info-box">
+  <h2>Available Alignment Methods</h2>
+  <p>On the BLASTN / BLASTP pages you can choose how the query is aligned to each
+  database sequence:</p>
+  <ul>
+    <li><b>Smith-Waterman (Local Alignment):</b> Finds the optimal local region of
+    similarity allowing gaps (insertions / deletions), using dynamic programming.
+    This is the recommended, more accurate method for finding conserved regions
+    and handling sequences of different lengths.</li>
+    <li><b>Simple (Global / same-offset comparison):</b> Compares both sequences
+    position-by-position from the start, without introducing gaps. This is the
+    original method and is faster but less accurate when indels are present.</li>
+  </ul>
+</div>
+
+<div class="info-box">
+  <h2>Interpreting Results</h2>
+  <ul>
+    <li><b>Identity (%):</b> The percentage of matching characters within the
+    aligned region.</li>
+    <li><b>E-value:</b> An estimate of how many matches you would expect by chance
+    in a database of this size. A lower E-value indicates a more significant
+    match.</li>
+    <li><b>Alignment:</b> Shows the query and subject sequences with the match line;
+    <code>|</code> = match, <code>*</code> = mismatch, <code>-</code> = gap.</li>
+  </ul>
+</div>
+
+<div style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);">
+  <a href="/blastn"><button class="nav-btn">Next Page</button></a>
+</div>
+</body>
+</html>

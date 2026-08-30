@@ -52,10 +52,56 @@
                 0 4px 6px rgba(0,0,0,0.2),
                 0 0 8px 3px rgba(180,0,255,0.3);
   }
+  .btn-3d {
+    color: white;
+    padding: 8px 20px;
+    font-size: 15px;
+    font-family: Arial, sans-serif;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transform: perspective(600px) translateZ(0);
+    box-shadow: 0 6px 0 var(--btn-shadow, #333), 0 8px 10px rgba(0,0,0,0.3);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    position: relative;
+    top: 0;
+  }
+  .btn-3d:hover {
+    transform: perspective(600px) translateZ(18px) translateY(-4px);
+    box-shadow: 0 12px 0 var(--btn-shadow, #333),
+                0 16px 20px rgba(0,0,0,0.35),
+                0 0 18px 6px var(--btn-glow, rgba(255,255,255,0.4)),
+                0 18px 30px var(--btn-glow, rgba(255,255,255,0.25));
+  }
+  .btn-3d:active {
+    transform: perspective(600px) translateZ(4px) translateY(2px);
+    box-shadow: 0 2px 0 var(--btn-shadow, #333),
+                0 4px 6px rgba(0,0,0,0.2),
+                0 0 8px 3px var(--btn-glow, rgba(255,255,255,0.3));
+  }
 </style>
 </head>
 
 <body style="background-color:#6BAED6;">
+<button id="shareBtn" onclick="shareThisPage()" class="btn-3d" style="position:fixed; top:15px; right:20px; background-color:#2c6e49; z-index:1000; --btn-shadow:#184a30; --btn-glow:rgba(46,204,113,0.55);">
+  🔗 Share
+</button>
+<script>
+function shareThisPage() {
+  var url = window.location.href;
+  if (navigator.share) {
+    navigator.share({ title: document.title, url: url }).catch(function(){});
+  } else {
+    navigator.clipboard.writeText(url).then(function() {
+      var btn = document.getElementById("shareBtn");
+      var original = btn.innerHTML;
+      btn.innerHTML = "✅ Link Copied!";
+      setTimeout(function(){ btn.innerHTML = original; }, 1800);
+    });
+  }
+}
+</script>
+
 
 <div id="loader">
   <canvas id="dna-canvas" width="680" height="280"></canvas>
@@ -77,6 +123,10 @@
 <form id="blastForm" method="POST" action="/runblastp">
   <p><b>Enter Protein Sequence</b></p>
   <textarea name="sequence" rows="10" cols="60"></textarea>
+  <br><br>
+  <p><b>Alignment Method:</b></p>
+  <label><input type="radio" name="method" value="sw" {% if method == 'sw' %}checked{% endif %}> Smith-Waterman (Local Alignment) — recommended</label><br>
+  <label><input type="radio" name="method" value="simple" {% if method == 'simple' %}checked{% endif %}> Simple (Global / same-offset comparison)</label>
   <br><br>
   <button type="submit">Run Blast</button>
 </form>
@@ -101,7 +151,7 @@
   </tr>
   {% for item in results %}
   <tr>
-    <td><a href="/details/{{ item.name }}">{{ item.name }}</a></td>
+    <td><a href="/details/{{ item.name }}?type=p&seq={{ query_sequence }}">{{ item.name }}</a></td>
     <td>{{ item.similarity }}%</td>
     <td>{{ item.evalue }}</td>
     <td>{{ item.description }}</td>

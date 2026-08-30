@@ -82,6 +82,7 @@ def load_database(file_path):
 
 
 def calculate_similarity(query, target):
+    """Simple/global method: compare both sequences from offset 0 (no gaps)."""
     if not query or not target:
         return 0.0
     matches = sum(1 for a, b in zip(query, target) if a == b)
@@ -89,7 +90,84 @@ def calculate_similarity(query, target):
     return round((matches / length) * 100, 2)
 
 
+def smith_waterman_align(query, subject, match=2, mismatch=-1, gap=-1):
+    """Classic Smith-Waterman local alignment (linear gap penalty).
+
+    Returns (q_ali, s_ali, match_line, score, identity_pct, aln_len).
+    """
+    n, m = len(query), len(subject)
+    if n == 0 or m == 0:
+        return ("", "", "", 0, 0.0, 0)
+
+    H = [[0] * (m + 1) for _ in range(n + 1)]
+    T = [[0] * (m + 1) for _ in range(n + 1)]  # 0=stop, 1=diag, 2=up, 3=left
+
+    max_score = 0
+    max_i = max_j = 0
+
+    for i in range(1, n + 1):
+        for j in range(1, m + 1):
+            diag  = H[i-1][j-1] + (match if query[i-1] == subject[j-1] else mismatch)
+            up    = H[i-1][j]   + gap
+            left  = H[i][j-1]   + gap
+
+            best, bdir = 0, 0
+            if diag  > best: best, bdir = diag,  1
+            if up    > best: best, bdir = up,    2
+            if left  > best: best, bdir = left,  3
+
+            H[i][j] = best
+            T[i][j] = bdir
+            if best > max_score:
+                max_score, max_i, max_j = best, i, j
+
+    i, j = max_i, max_j
+    q_ali, s_ali = [], []
+    while i > 0 and j > 0 and T[i][j] != 0:
+        if T[i][j] == 1:
+            q_ali.append(query[i-1]); s_ali.append(subject[j-1]); i -= 1; j -= 1
+        elif T[i][j] == 2:
+            q_ali.append(query[i-1]); s_ali.append("-"); i -= 1
+        else:
+            q_ali.append("-"); s_ali.append(subject[j-1]); j -= 1
+
+    q_ali.reverse(); s_ali.reverse()
+    q_ali_str = "".join(q_ali)
+    s_ali_str = "".join(s_ali)
+
+    aln_len   = len(q_ali_str)
+    matches   = sum(1 for a, b in zip(q_ali_str, s_ali_str) if a == b and a != "-")
+    identity  = round((matches / aln_len) * 100, 2) if aln_len else 0.0
+
+    match_line = ""
+    for a, b in zip(q_ali_str, s_ali_str):
+        if a == "-" or b == "-":
+            match_line += "-"
+        elif a == b:
+            match_line += "|"
+        else:
+            match_line += "*"
+
+    return q_ali_str, s_ali_str, match_line, max_score, identity, aln_len
+
+
+ALIGNMENT_METHODS = ("sw", "simple")
+
+
+def align_pair(query_seq, subject_seq, method="sw"):
+    """Unified wrapper: returns (similarity, evalue, alignment) for a method."""
+    if method == "sw":
+        qa, sa, ml, score, identity, aln_len = smith_waterman_align(query_seq, subject_seq)
+        evalue = calculate_evalue_aligned(score, len(query_seq))
+        return identity, aln_len, evalue, (qa, sa, ml, score)
+    else:
+        similarity = calculate_similarity(query_seq, subject_seq)
+        evalue     = calculate_evalue(similarity, len(query_seq))
+        return similarity, max(len(query_seq), len(subject_seq)), evalue, None
+
+
 def calculate_evalue(similarity, query_length, db_size=97):
+    """Estimated e-value for the simple (global) method."""
     if similarity >= 100.0:
         return 0.0
     mismatches = round((1.0 - similarity / 100.0) * query_length)
@@ -102,12 +180,23 @@ def calculate_evalue(similarity, query_length, db_size=97):
         return 10.0
 
 
-def search_database(query_sequence, database_file):
+def calculate_evalue_aligned(score, query_length, db_size=97):
+    """Score-based estimated e-value for the Smith-Waterman local alignment."""
+    if score <= 0:
+        return 1.0
+    try:
+        lam = 0.2
+        evalue = db_size * math.exp(-lam * score) / max(query_length, 1)
+        return round(min(max(evalue, 1e-300), 10.0), 6)
+    except Exception:
+        return 10.0
+
+
+def search_database(query_sequence, database_file, method="sw"):
     database = load_database(database_file)
     results  = []
     for entry in database:
-        similarity = calculate_similarity(query_sequence, entry["sequence"])
-        evalue     = calculate_evalue(similarity, len(query_sequence))
+        similarity, aln_len, evalue, _ = align_pair(query_sequence, entry["sequence"], method)
         results.append({
             "name":        entry["id"],
             "description": entry["description"],
@@ -119,28 +208,36 @@ def search_database(query_sequence, database_file):
     return results[:5]
 
 
-def build_alignment(query_seq, subject_seq):
-    max_len        = max(len(query_seq), len(subject_seq))
-    query_padded   = query_seq.ljust(max_len, "-")
-    subject_padded = subject_seq.ljust(max_len, "-")
-
-    match_line = ""
-    for q, s in zip(query_padded, subject_padded):
-        if q == "-" and s == "-":
-            match_line += " "
-        elif q == "-" or s == "-":
-            match_line += "-"
-        elif q == s:
-            match_line += "|"
-        else:
-            match_line += "*"
+def build_alignment(query_seq, subject_seq, method="sw"):
+    """Build alignment display blocks. Uses Smith-Waterman if method == 'sw',
+    otherwise the old same-offset ('simple') comparison."""
+    if method == "sw":
+        qa, sa, ml, score = smith_waterman_align(query_seq, subject_seq)[:4]
+        query_line   = qa
+        subject_line = sa
+        match_line   = ml
+        max_len      = len(qa)
+    else:
+        max_len        = max(len(query_seq), len(subject_seq))
+        query_line     = query_seq.ljust(max_len, "-")
+        subject_line   = subject_seq.ljust(max_len, "-")
+        match_line     = ""
+        for q, s in zip(query_line, subject_line):
+            if q == "-" and s == "-":
+                match_line += " "
+            elif q == "-" or s == "-":
+                match_line += "-"
+            elif q == s:
+                match_line += "|"
+            else:
+                match_line += "*"
 
     chunk_size = 60
     blocks = []
     for i in range(0, max_len, chunk_size):
-        q_chunk = query_padded[i:i+chunk_size]
+        q_chunk = query_line[i:i+chunk_size]
         m_chunk = match_line[i:i+chunk_size]
-        s_chunk = subject_padded[i:i+chunk_size]
+        s_chunk = subject_line[i:i+chunk_size]
         if q_chunk.strip("-") or s_chunk.strip("-"):
             blocks.append({
                 "query":   q_chunk,
@@ -179,28 +276,36 @@ def dn():
 def blastinfo():
     return render_template("BlastInfo.html")
 
+def current_method():
+    m = session.get("alignment_method", "sw")
+    return m if m in ALIGNMENT_METHODS else "sw"
+
 @app.route("/blastn")
 def blastn():
     # Fresh page load — purana error clear karo
     session["blast_error"]    = ""
     session["blastn_results"] = []
-    return render_template("BlastN.html", results=[])
+    return render_template("BlastN.html", results=[], query_sequence="", method=current_method())
 
 @app.route("/blastp")
 def blastp():
     # Fresh page load — purana error clear karo
     session["blast_error"]    = ""
     session["blastp_results"] = []
-    return render_template("BlastP.html", results=[])
+    return render_template("BlastP.html", results=[], query_sequence="", method=current_method())
 
 
 @app.route("/runblastn", methods=["POST"])
 def runblastn():
     raw = request.form["sequence"].strip()
+    method = request.form.get("method", "sw")
+    if method not in ALIGNMENT_METHODS:
+        method = "sw"
 
-    session["last_blast"]     = "n"
-    session["blastn_results"] = []
-    session["blast_error"]    = ""
+    session["last_blast"]       = "n"
+    session["alignment_method"] = method
+    session["blastn_results"]   = []
+    session["blast_error"]      = ""
 
     # Protein sequence BlastN mein dali?
     if is_protein_sequence(raw):
@@ -220,20 +325,24 @@ def runblastn():
     session["blastn_query"]   = sequence
     session["query_sequence"] = sequence
 
-    results = search_database(sequence, DATABASE_NUCLEOTIDE)
+    results = search_database(sequence, DATABASE_NUCLEOTIDE, method)
     session["blastn_results"] = results
 
     print("BlastN top hit:", results[0]["name"] if results else "No results")
-    return redirect(url_for("blastn_results"))
+    return redirect(url_for("blastn_results", seq=sequence))
 
 
 @app.route("/runblastp", methods=["POST"])
 def runblastp():
     raw = request.form["sequence"].strip()
+    method = request.form.get("method", "sw")
+    if method not in ALIGNMENT_METHODS:
+        method = "sw"
 
-    session["last_blast"]     = "p"
-    session["blastp_results"] = []
-    session["blast_error"]    = ""
+    session["last_blast"]       = "p"
+    session["alignment_method"] = method
+    session["blastp_results"]   = []
+    session["blast_error"]      = ""
 
     # DNA sequence BlastP mein dali?
     if is_dna_sequence(raw):
@@ -253,34 +362,56 @@ def runblastp():
     session["blastp_query"]   = sequence
     session["query_sequence"] = sequence
 
-    results = search_database(sequence, DATABASE_PROTEIN)
+    results = search_database(sequence, DATABASE_PROTEIN, method)
     session["blastp_results"] = results
 
     print("BlastP top hit:", results[0]["name"] if results else "No results")
-    return redirect(url_for("blastp_results"))
+    return redirect(url_for("blastp_results", seq=sequence))
 
 
 @app.route("/blastp_results")
 def blastp_results():
-    results = session.get("blastp_results", [])
-    return render_template("BlastP.html", results=results)
+    method = current_method()
+    seq_param = request.args.get("seq", "")
+    if seq_param:
+        sequence = re.sub(r"[^ARNDCQEGHILKMFPSTWYVX]", "", seq_param.upper())
+        results = search_database(sequence, DATABASE_PROTEIN, method)
+        session["last_blast"]     = "p"
+        session["blastp_query"]   = sequence
+        session["query_sequence"] = sequence
+        session["blastp_results"] = results
+    else:
+        sequence = session.get("blastp_query", "")
+        results  = session.get("blastp_results", [])
+    return render_template("BlastP.html", results=results, query_sequence=sequence, method=method)
 
 @app.route("/blastn_results")
 def blastn_results():
-    results = session.get("blastn_results", [])
-    return render_template("BlastN.html", results=results)
+    method = current_method()
+    seq_param = request.args.get("seq", "")
+    if seq_param:
+        sequence = re.sub(r"[^ATGCN]", "", seq_param.upper())
+        results = search_database(sequence, DATABASE_NUCLEOTIDE, method)
+        session["last_blast"]     = "n"
+        session["blastn_query"]   = sequence
+        session["query_sequence"] = sequence
+        session["blastn_results"] = results
+    else:
+        sequence = session.get("blastn_query", "")
+        results  = session.get("blastn_results", [])
+    return render_template("BlastN.html", results=results, query_sequence=sequence, method=method)
 
 
 @app.route("/details/<name>")
 def details(name):
-    blast_type = session.get("last_blast", "p")
+    blast_type = request.args.get("type") or session.get("last_blast", "p")
+    query_seq  = request.args.get("seq", "")
 
-    if blast_type == "n":
-        query_seq   = session.get("blastn_query", "")
-        all_results = session.get("blastn_results", [])
-    else:
-        query_seq   = session.get("blastp_query", "")
-        all_results = session.get("blastp_results", [])
+    if not query_seq:
+        if blast_type == "n":
+            query_seq = session.get("blastn_query", "")
+        else:
+            query_seq = session.get("blastp_query", "")
 
     conn = sqlite3.connect(DATABASE_FIXED)
     cursor = conn.cursor()
@@ -312,8 +443,12 @@ def details(name):
         "detection_technique": meta_row[8] if meta_row and len(meta_row) > 8 else "N/A"
     }
 
-    hit = next((r for r in all_results if r["name"] == name), None)
-    alignment_blocks, match_line = build_alignment(query_seq, subject_seq)
+    hit = None
+    if query_seq and subject_seq:
+        similarity, aln_len, evalue, _ = align_pair(query_seq, subject_seq, current_method())
+        hit = {"similarity": similarity, "evalue": evalue, "aln_len": aln_len}
+
+    alignment_blocks, match_line = build_alignment(query_seq, subject_seq, current_method())
 
     alphafold_url = NDM_ALPHAFOLD_LINKS.get(name, "")
     pdb_url       = NDM_PDB_LINKS.get(name, "")
