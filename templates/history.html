@@ -46,6 +46,8 @@
   table.history th { text-align: left; padding: 12px 14px; background: #f1f5f9; color: var(--brand); font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; border-bottom: 2px solid var(--line); }
   table.history td { padding: 13px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
   table.history tr:hover td { background: #fafcff; }
+  tr.history-row { cursor: pointer; }
+  tr.history-row:hover td { background: #eef6f5 !important; }
   .chip { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
   .chip.n { background: #e3edf7; color: #1f4e78; }
   .chip.p { background: var(--accent-soft); color: var(--accent); }
@@ -113,14 +115,18 @@
       </thead>
       <tbody>
         {% for r in records %}
-        <tr>
+        {% set results_url = ('/blastn_results' if r.blast_type.startswith('BLASTn') else '/blastp_results')
+                             + '?seq=' + (r.query|urlencode) + '&method=' + (r.method_key or 'sw') %}
+        {% set details_url = ('/details/' + r.top_hit + '?type=' + ('n' if r.blast_type.startswith('BLASTn') else 'p')
+                              + '&seq=' + (r.query|urlencode)) %}
+        <tr class="history-row" onclick="window.location.href='{{ results_url }}'">
           <td class="time">{{ r.time }}</td>
           <td><span class="chip {% if r.blast_type.startswith('BLASTn') %}n{% else %}p{% endif %}">{{ "BLASTn" if r.blast_type.startswith("BLASTn") else "BLASTp" }}</span></td>
           <td><span class="chip method">{{ r.method }}</span></td>
           <td><div class="query-preview" title="{{ r.query }}">{{ r.query }}</div></td>
           <td>
             {% if r.top_hit and r.top_hit != "No match" %}
-            <a class="hitlink" href="/details/{{ r.top_hit }}">{{ r.top_hit }}</a>
+            <a class="hitlink" href="{{ details_url }}" onclick="event.stopPropagation()">{{ r.top_hit }}</a>
             {% else %}
             <span class="chip hit">No match</span>
             {% endif %}

@@ -369,6 +369,7 @@ def runblastn():
         "time":       datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "blast_type": "BLASTn (DNA)",
         "method":     "Local (Smith-Waterman)" if method == "sw" else "Global (Simple)",
+        "method_key": method,
         "query":      sequence,
         "query_len":  len(sequence),
         "top_hit":    top["name"] if top else "No match",
@@ -418,6 +419,7 @@ def runblastp():
         "time":       datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "blast_type": "BLASTp (Protein)",
         "method":     "Local (Smith-Waterman)" if method == "sw" else "Global (Simple)",
+        "method_key": method,
         "query":      sequence,
         "query_len":  len(sequence),
         "top_hit":    top["name"] if top else "No match",
@@ -431,7 +433,10 @@ def runblastp():
 
 @app.route("/blastp_results")
 def blastp_results():
-    method = current_method()
+    method = request.args.get("method") or current_method()
+    if method not in ALIGNMENT_METHODS:
+        method = "sw"
+    session["alignment_method"] = method
     seq_param = request.args.get("seq", "")
     if seq_param:
         sequence = re.sub(r"[^ARNDCQEGHILKMFPSTWYVX]", "", seq_param.upper())
@@ -447,7 +452,10 @@ def blastp_results():
 
 @app.route("/blastn_results")
 def blastn_results():
-    method = current_method()
+    method = request.args.get("method") or current_method()
+    if method not in ALIGNMENT_METHODS:
+        method = "sw"
+    session["alignment_method"] = method
     seq_param = request.args.get("seq", "")
     if seq_param:
         sequence = re.sub(r"[^ATGCN]", "", seq_param.upper())
