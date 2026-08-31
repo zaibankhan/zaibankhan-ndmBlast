@@ -347,7 +347,7 @@ def runblastn():
     if is_protein_sequence(raw):
         session["blastn_query"]   = ""
         session["query_sequence"] = ""
-        session["blast_error"]    = "⚠️ Protein sequence detect hui! BlastN sirf DNA sequences (A, T, G, C) accept karta hai. Protein ke liye BlastP use karo."
+        session["blast_error"]    = "⚠️ You have entered the wrong sequence. A protein sequence was detected, but BLASTn accepts only DNA nucleotides (A, T, G, C). Please use BLASTp for protein sequences."
         return redirect(url_for("blastn_results"))
 
     sequence = re.sub(r"[^ATGCN]", "", raw.upper())
@@ -397,7 +397,7 @@ def runblastp():
     if is_dna_sequence(raw):
         session["blastp_query"]   = ""
         session["query_sequence"] = ""
-        session["blast_error"]    = "⚠️ DNA sequence detect hui! BlastP sirf Protein sequences (amino acids) accept karta hai. DNA ke liye BlastN use karo."
+        session["blast_error"]    = "⚠️ You have entered the wrong sequence. A DNA/nucleotide sequence was detected, but BLASTp accepts only protein sequences (amino acids). Please use BLASTn for DNA sequences."
         return redirect(url_for("blastp_results"))
 
     sequence = re.sub(r"[^ARNDCQEGHILKMFPSTWYVX]", "", raw.upper())
