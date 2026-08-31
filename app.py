@@ -5,6 +5,7 @@ import sqlite3
 import math
 import json
 import os
+from datetime import datetime
 
 
 # ── NDM VARIANT STRUCTURE LINKS ───────────────────────────────────────────────
@@ -68,6 +69,41 @@ if os.path.exists(PUBLICATIONS_FILE):
 
 # Protein-unique chars — ye DNA mein kabhi nahi aate
 PROTEIN_ONLY_CHARS = set("RDEQHILKMFPWYV")
+
+# ── SEARCH HISTORY (persisted locally, never sent online) ───────────────────
+HISTORY_FILE = "database/search_history.json"
+HISTORY_LIMIT = 100
+
+
+def load_history():
+    """Read persisted search history from the local JSON file."""
+    if not os.path.exists(HISTORY_FILE):
+        return []
+    try:
+        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def save_history(records):
+    try:
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(records, f, indent=2)
+    except Exception:
+        pass
+
+
+def add_history_entry(entry):
+    """Prepend a new search entry, keeping only the newest HISTORY_LIMIT."""
+    records = load_history()
+    records.insert(0, entry)
+    save_history(records[:HISTORY_LIMIT])
+
+
+def clear_history():
+    save_history([])
 
 
 def load_database(file_path):
@@ -328,6 +364,18 @@ def runblastn():
     results = search_database(sequence, DATABASE_NUCLEOTIDE, method)
     session["blastn_results"] = results
 
+    top = results[0] if results else None
+    add_history_entry({
+        "time":       datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "blast_type": "BLASTn (DNA)",
+        "method":     "Local (Smith-Waterman)" if method == "sw" else "Global (Simple)",
+        "query":      sequence,
+        "query_len":  len(sequence),
+        "top_hit":    top["name"] if top else "No match",
+        "identity":   top["similarity"] if top else None,
+        "evalue":     top["evalue"] if top else None,
+    })
+
     print("BlastN top hit:", results[0]["name"] if results else "No results")
     return redirect(url_for("blastn_results", seq=sequence))
 
@@ -364,6 +412,18 @@ def runblastp():
 
     results = search_database(sequence, DATABASE_PROTEIN, method)
     session["blastp_results"] = results
+
+    top = results[0] if results else None
+    add_history_entry({
+        "time":       datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "blast_type": "BLASTp (Protein)",
+        "method":     "Local (Smith-Waterman)" if method == "sw" else "Global (Simple)",
+        "query":      sequence,
+        "query_len":  len(sequence),
+        "top_hit":    top["name"] if top else "No match",
+        "identity":   top["similarity"] if top else None,
+        "evalue":     top["evalue"] if top else None,
+    })
 
     print("BlastP top hit:", results[0]["name"] if results else "No results")
     return redirect(url_for("blastp_results", seq=sequence))
@@ -479,6 +539,18 @@ def publications(name):
         variant_id=name,
         links=links,
     )
+
+
+@app.route("/history")
+def history():
+    records = load_history()
+    return render_template("history.html", records=records, count=len(records))
+
+
+@app.route("/clear_history", methods=["POST"])
+def clear_history_route():
+    clear_history()
+    return redirect(url_for("history"))
 
 
 if __name__ == "__main__":

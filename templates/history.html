@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Search History &mdash; NDM-BLAST</title>
+<style>
+  :root {
+    --bg: #f4f6fa;
+    --card: #ffffff;
+    --ink: #1f2937;
+    --muted: #6b7280;
+    --brand: #1f4e78;
+    --accent: #0e9f8f;
+    --accent-soft: #e6f6f4;
+    --line: #e4e7ee;
+    --shadow: 0 10px 30px rgba(20, 40, 70, 0.10);
+    --radius: 14px;
+    --danger: #b3261e;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", -apple-system, Arial, sans-serif; background: var(--bg); color: var(--ink); }
+
+  .topbar { background: var(--card); border-bottom: 1px solid var(--line); padding: 14px 32px; display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-mark { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, var(--brand), var(--accent)); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; }
+  .brand-name { font-weight: 700; font-size: 18px; color: var(--brand); }
+  .brand-sub { font-size: 12px; color: var(--muted); }
+  .share-btn { background: #fff; border: 1px solid var(--line); color: var(--ink); padding: 9px 18px; border-radius: 9px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .18s ease; }
+  .share-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .navbar { background: var(--card); border-bottom: 1px solid var(--line); padding: 10px 32px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .navlink { text-decoration: none; color: var(--muted); padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; transition: all .15s ease; }
+  .navlink:hover { color: var(--brand); background: #f1f5f9; }
+  .navlink.active { color: #fff; background: var(--brand); }
+
+  .wrap { max-width: 980px; margin: 0 auto; padding: 32px 24px 60px; }
+  .head-row { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+  .page-title { font-size: 26px; font-weight: 700; color: var(--brand); margin: 0 0 4px; }
+  .page-sub { color: var(--muted); margin: 0; font-size: 14px; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px; }
+  .empty { color: var(--muted); background: var(--card); border: 1px dashed var(--line); border-radius: 12px; padding: 40px 24px; text-align: center; }
+
+  table.history { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.history th { text-align: left; padding: 12px 14px; background: #f1f5f9; color: var(--brand); font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; border-bottom: 2px solid var(--line); }
+  table.history td { padding: 13px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.history tr:hover td { background: #fafcff; }
+  .chip { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+  .chip.n { background: #e3edf7; color: #1f4e78; }
+  .chip.p { background: var(--accent-soft); color: var(--accent); }
+  .chip.method { background: #f1f5f9; color: var(--muted); }
+  .chip.hit { background: #fdeef0; color: var(--danger); }
+  a.hitlink { color: var(--brand); font-weight: 700; text-decoration: none; }
+  a.hitlink:hover { text-decoration: underline; }
+  .time { color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .query-preview { font-family: "Consolas", monospace; font-size: 12px; color: var(--muted); max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .clear-form { margin-left: auto; }
+  .clear-btn { background: #fff; color: var(--danger); border: 1px solid #f0b6b1; border-radius: 9px; padding: 9px 18px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .15s ease; }
+  .clear-btn:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+  .legend { margin: 14px 0 0; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark">NDM</div>
+    <div>
+      <div class="brand-name">NDM-BLAST</div>
+      <div class="brand-sub">Search History</div>
+    </div>
+  </div>
+  <button id="shareBtn" class="share-btn" onclick="shareThisPage()">Share</button>
+</div>
+
+<div class="navbar">
+  <a class="navlink" href="/">Home</a>
+  <a class="navlink" href="/blastn">BLASTn &mdash; NDM</a>
+  <a class="navlink" href="/blastp">BLASTp &mdash; NDM</a>
+  <a class="navlink active" href="/history">History</a>
+  <a class="navlink" href="/blastinfo">About</a>
+</div>
+
+<div class="wrap">
+  <div class="head-row">
+    <div>
+      <h1 class="page-title">Search History</h1>
+      <p class="page-sub">Your past BLAST searches, stored locally on this machine.</p>
+    </div>
+    {% if count %}
+    <form class="clear-form" method="POST" action="/clear_history" onsubmit="return confirm('Clear all search history?');">
+      <button type="submit" class="clear-btn">Clear History</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if records %}
+  <div class="card" style="padding:0; overflow:hidden;">
+    <table class="history">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Type</th>
+          <th>Method</th>
+          <th>Query</th>
+          <th>Top Hit</th>
+          <th>Identity</th>
+          <th>E-value</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in records %}
+        <tr>
+          <td class="time">{{ r.time }}</td>
+          <td><span class="chip {% if r.blast_type.startswith('BLASTn') %}n{% else %}p{% endif %}">{{ "BLASTn" if r.blast_type.startswith("BLASTn") else "BLASTp" }}</span></td>
+          <td><span class="chip method">{{ r.method }}</span></td>
+          <td><div class="query-preview" title="{{ r.query }}">{{ r.query }}</div></td>
+          <td>
+            {% if r.top_hit and r.top_hit != "No match" %}
+            <a class="hitlink" href="/details/{{ r.top_hit }}">{{ r.top_hit }}</a>
+            {% else %}
+            <span class="chip hit">No match</span>
+            {% endif %}
+          </td>
+          <td>{% if r.identity is not none %}{{ r.identity }}%{% else %}&mdash;{% endif %}</td>
+          <td>{% if r.evalue is not none %}{{ r.evalue }}{% else %}&mdash;{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="legend">Showing {{ count }} search record(s). History is stored in <code>database/search_history.json</code> and never sent online.</p>
+  {% else %}
+  <div class="empty">
+    No searches recorded yet. Run a BLASTn or BLASTp search and it will appear here.
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function shareThisPage() {
+  var url = window.location.href;
+  if (navigator.share) {
+    navigator.share({ title: document.title, url: url }).catch(function(){});
+  } else {
+    navigator.clipboard.writeText(url).then(function() {
+      var btn = document.getElementById("shareBtn");
+      btn.textContent = "Link Copied!";
+      setTimeout(function(){ btn.textContent = "Share"; }, 1800);
+    });
+  }
+}
+</script>
+</body>
+</html>
