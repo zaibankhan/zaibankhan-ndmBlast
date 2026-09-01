@@ -45,18 +45,6 @@
   textarea.query { width: 100%; min-height: 170px; border: 1px solid var(--line); border-radius: 10px; padding: 14px; font-size: 14px; font-family: "Consolas", "Courier New", monospace; resize: vertical; line-height: 1.5; color: var(--ink); }
   textarea.query:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(14,159,143,0.15); }
 
-  .method-group { margin-top: 20px; }
-  .method-label { font-weight: 600; margin-bottom: 10px; display: block; color: var(--ink); }
-  .segment { display: inline-flex; background: #eef1f6; border-radius: 12px; padding: 5px; gap: 5px; border: 1px solid var(--line); flex-wrap: wrap; }
-  .segment label { cursor: pointer; }
-  .segment input { position: absolute; opacity: 0; width: 0; }
-  .segment .seg { display: flex; flex-direction: column; align-items: flex-start; padding: 12px 18px; border-radius: 9px; transition: all .18s ease; border: 1px solid transparent; }
-  .segment .seg .t1 { font-weight: 700; font-size: 14px; color: var(--ink); }
-  .segment .seg .t2 { font-size: 12px; color: var(--muted); margin-top: 3px; }
-  .segment input:checked + .seg { background: #fff; border-color: var(--accent); box-shadow: 0 4px 14px rgba(14,159,143,0.18); }
-  .segment input:checked + .seg .t1 { color: var(--accent); }
-  .segment .seg:hover:not(:checked) { background: #fff; }
-
   .run-row { display: flex; align-items: center; gap: 16px; margin-top: 24px; }
   .run-btn { background: linear-gradient(135deg, var(--brand), var(--accent)); color: #fff; border: none; padding: 13px 32px; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; box-shadow: 0 6px 18px rgba(31,78,120,0.25); }
   .run-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(31,78,120,0.32); }
@@ -113,26 +101,6 @@
     <form id="blastForm" method="POST" action="/runblastp">
       <label class="label" for="seq">Enter Protein Sequence</label>
       <textarea id="seq" name="sequence" class="query" rows="10"></textarea>
-
-      <div class="method-group">
-        <span class="method-label">Alignment Method</span>
-        <div class="segment" role="radiogroup">
-          <label>
-            <input type="radio" name="method" value="sw" {% if method == 'sw' %}checked{% endif %}>
-            <span class="seg">
-              <span class="t1">Local &mdash; Smith-Waterman</span>
-              <span class="t2">Optimal local alignment with gaps (recommended)</span>
-            </span>
-          </label>
-          <label>
-            <input type="radio" name="method" value="simple" {% if method == 'simple' %}checked{% endif %}>
-            <span class="seg">
-              <span class="t1">Global &mdash; Simple</span>
-              <span class="t2">Fast same-offset comparison</span>
-            </span>
-          </label>
-        </div>
-      </div>
 
       <div class="run-row">
         <button type="submit" class="run-btn">Run BLAST</button>

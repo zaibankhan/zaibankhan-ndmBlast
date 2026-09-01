@@ -78,18 +78,22 @@
   </div>
 
   <div class="card">
-    <h2>Available Alignment Methods</h2>
+    <h2>How the BLAST Algorithm Works</h2>
     <div class="method-box">
-      <h3>Local &mdash; Smith-Waterman (recommended)</h3>
-      <p>Finds the optimal region of local similarity while allowing gaps
-      (insertions / deletions), using dynamic programming. Most accurate for
-      identifying conserved regions and for sequences of different lengths.</p>
+      <h3>Word (k-mer) Seeding</h3>
+      <p>The query is broken into short words (11 nucleotides for BLASTn,
+      3 amino acids for BLASTp). The subject database is scanned for exact,
+      identical words.</p>
     </div>
     <div class="method-box">
-      <h3>Global &mdash; Simple</h3>
-      <p>A fast comparison that aligns both sequences position-by-position from
-      the start without introducing gaps. Faster for quick screening but less
-      accurate when insertions or deletions are present.</p>
+      <h3>Ungapped Extension (HSP)</h3>
+      <p>Each seed is extended in both directions along its diagonal while the
+      score keeps improving, building a high-scoring segment pair (HSP).</p>
+    </div>
+    <div class="method-box">
+      <h3>Gapped Refinement</h3>
+      <p>The best HSP region is refined with a gapped local alignment
+      (Smith-Waterman) so insertions and deletions are handled accurately.</p>
     </div>
   </div>
 

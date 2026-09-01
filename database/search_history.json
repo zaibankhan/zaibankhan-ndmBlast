@@ -1,1 +1,24 @@
-[]
+[
+  {
+    "time": "2026-09-01 17:33:08",
+    "blast_type": "BLASTp (Protein)",
+    "method": "BLAST algorithm",
+    "method_key": "p",
+    "query": "MKVIAHTGLLKGLSSLAVLAIFHFHFDLGNMDDDLFGDDAVTVGEAVPASLDEPLDSGLRVLDEAGFF",
+    "query_len": 68,
+    "top_hit": "NDM-12",
+    "identity": 83.33,
+    "evalue": 0.000252
+  },
+  {
+    "time": "2026-09-01 17:33:02",
+    "blast_type": "BLASTn (DNA)",
+    "method": "BLAST algorithm",
+    "method_key": "n",
+    "query": "ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT",
+    "query_len": 80,
+    "top_hit": "NDM-87",
+    "identity": 56.32,
+    "evalue": 0.0
+  }
+]

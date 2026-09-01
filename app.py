@@ -126,8 +126,9 @@ def calculate_similarity(query, target):
     return round((matches / length) * 100, 2)
 
 
-def smith_waterman_align(query, subject, match=2, mismatch=-1, gap=-1):
-    """Classic Smith-Waterman local alignment (linear gap penalty).
+def smith_waterman_align(query, subject, match=2, mismatch=-1, gap_open=-2, gap_extend=-1):
+    """Gapped local alignment (Smith-Waterman, affine gap penalty).
+    Used to refine the region found by the BLAST seed-and-extend step.
 
     Returns (q_ali, s_ali, match_line, score, identity_pct, aln_len).
     """
@@ -135,28 +136,33 @@ def smith_waterman_align(query, subject, match=2, mismatch=-1, gap=-1):
     if n == 0 or m == 0:
         return ("", "", "", 0, 0.0, 0)
 
-    H = [[0] * (m + 1) for _ in range(n + 1)]
-    T = [[0] * (m + 1) for _ in range(n + 1)]  # 0=stop, 1=diag, 2=up, 3=left
+    # Affine-gap dynamic programming matrices
+    H = [[0] * (m + 1) for _ in range(n + 1)]  # best score ending at (i,j)
+    E = [[0] * (m + 1) for _ in range(n + 1)]  # gap in query (moving down)
+    F = [[0] * (m + 1) for _ in range(n + 1)]  # gap in subject (moving right)
+    T = [[0] * (m + 1) for _ in range(n + 1)]  # 0=stop,1=diag,2=E,3=F
 
     max_score = 0
     max_i = max_j = 0
-
     for i in range(1, n + 1):
         for j in range(1, m + 1):
-            diag  = H[i-1][j-1] + (match if query[i-1] == subject[j-1] else mismatch)
-            up    = H[i-1][j]   + gap
-            left  = H[i][j-1]   + gap
-
-            best, bdir = 0, 0
-            if diag  > best: best, bdir = diag,  1
-            if up    > best: best, bdir = up,    2
-            if left  > best: best, bdir = left,  3
-
+            E[i][j] = max(H[i-1][j] + gap_open, E[i-1][j] + gap_extend)
+            F[i][j] = max(H[i][j-1] + gap_open, F[i][j-1] + gap_extend)
+            diag = H[i-1][j-1] + (match if query[i-1] == subject[j-1] else mismatch)
+            best = max(0, diag, E[i][j], F[i][j])
             H[i][j] = best
-            T[i][j] = bdir
+            if best == diag:
+                T[i][j] = 1
+            elif best == E[i][j]:
+                T[i][j] = 2
+            elif best == F[i][j]:
+                T[i][j] = 3
+            else:
+                T[i][j] = 0
             if best > max_score:
                 max_score, max_i, max_j = best, i, j
 
+    # Traceback
     i, j = max_i, max_j
     q_ali, s_ali = [], []
     while i > 0 and j > 0 and T[i][j] != 0:
@@ -171,9 +177,9 @@ def smith_waterman_align(query, subject, match=2, mismatch=-1, gap=-1):
     q_ali_str = "".join(q_ali)
     s_ali_str = "".join(s_ali)
 
-    aln_len   = len(q_ali_str)
-    matches   = sum(1 for a, b in zip(q_ali_str, s_ali_str) if a == b and a != "-")
-    identity  = round((matches / aln_len) * 100, 2) if aln_len else 0.0
+    aln_len  = len(q_ali_str)
+    matches  = sum(1 for a, b in zip(q_ali_str, s_ali_str) if a == b and a != "-")
+    identity = round((matches / aln_len) * 100, 2) if aln_len else 0.0
 
     match_line = ""
     for a, b in zip(q_ali_str, s_ali_str):
@@ -187,56 +193,130 @@ def smith_waterman_align(query, subject, match=2, mismatch=-1, gap=-1):
     return q_ali_str, s_ali_str, match_line, max_score, identity, aln_len
 
 
-ALIGNMENT_METHODS = ("sw", "simple")
+def build_word_index(seq, w):
+    """BLAST step 1 (seeding): map every word (k-mer) of the query to its positions."""
+    index = {}
+    for i in range(0, len(seq) - w + 1):
+        index.setdefault(seq[i:i+w], []).append(i)
+    return index
 
 
-def align_pair(query_seq, subject_seq, method="sw"):
-    """Unified wrapper: returns (similarity, evalue, alignment) for a method."""
-    if method == "sw":
-        qa, sa, ml, score, identity, aln_len = smith_waterman_align(query_seq, subject_seq)
-        evalue = calculate_evalue_aligned(score, len(query_seq))
-        return identity, aln_len, evalue, (qa, sa, ml, score)
-    else:
-        similarity = calculate_similarity(query_seq, subject_seq)
-        evalue     = calculate_evalue(similarity, len(query_seq))
-        return similarity, max(len(query_seq), len(subject_seq)), evalue, None
+def blast_align(query, subject, word_size=11, match=2, mismatch=-1,
+                gap_open=-2, gap_extend=-1, x_drop=5):
+    """BLAST-style heuristic local alignment:
+      1. Seed: exact word (k-mer) matches between query and subject.
+      2. Extend: ungapped extension of each seed into a maximal HSP
+         (High-scoring Segment Pair) with an X-drop threshold.
+      3. Refine: gapped Smith-Waterman within the best HSP window.
+
+    Returns (q_ali, s_ali, match_line, score, identity_pct, aln_len).
+    """
+    n, m = len(query), len(subject)
+    if n == 0 or m == 0:
+        return ("", "", "", 0, 0.0, 0)
+
+    # For very short inputs fall back to full gapped alignment.
+    if n < word_size or m < word_size:
+        return smith_waterman_align(query, subject, match, mismatch, gap_open, gap_extend)
+
+    q_index = build_word_index(query, word_size)
+    best_hsp = None  # (score, q_start, q_end, s_start, s_end)
+
+    # Step 1 + 2: seed and ungapped extend
+    for sj in range(0, m - word_size + 1):
+        word = subject[sj:sj+word_size]
+        for qi in q_index.get(word, []):
+            si = sj
+            # score of the seed itself
+            seed = word_size * match
+
+            # --- extend right ---
+            score = seed
+            best_score = seed
+            best_off = 0
+            off = 0
+            while qi + word_size + off < n and si + word_size + off < m:
+                score += match if query[qi+word_size+off] == subject[si+word_size+off] else mismatch
+                off += 1
+                if score > best_score:
+                    best_score = score
+                    best_off = off
+                if score < best_score - x_drop:
+                    break
+            right_end_q = qi + word_size + best_off
+            right_end_s = si + word_size + best_off
+            right_score = best_score
+
+            # --- extend left ---
+            score = right_score
+            best_score_left = right_score
+            best_off_left = 0
+            off = 0
+            while qi - 1 - off >= 0 and si - 1 - off >= 0:
+                score += match if query[qi-1-off] == subject[si-1-off] else mismatch
+                off += 1
+                if score > best_score_left:
+                    best_score_left = score
+                    best_off_left = off
+                if score < best_score_left - x_drop:
+                    break
+            q_start = qi - best_off_left
+            s_start = si - best_off_left
+            hsp = (best_score_left, q_start, right_end_q, s_start, right_end_s)
+            if best_hsp is None or hsp[0] > best_hsp[0]:
+                best_hsp = hsp
+
+    if best_hsp is None or best_hsp[0] <= 0:
+        # No seed found: fall back to gapped local alignment across whole seqs.
+        return smith_waterman_align(query, subject, match, mismatch, gap_open, gap_extend)
+
+    _, q_start, q_end, s_start, s_end = best_hsp
+
+    # Slight padding around the HSP before gapped refinement.
+    pad = 20
+    q_win_start = max(0, q_start - pad)
+    q_win_end   = min(n, q_end + pad)
+    s_win_start = max(0, s_start - pad)
+    s_win_end   = min(m, s_end + pad)
+    q_win = query[q_win_start:q_win_end]
+    s_win = subject[s_win_start:s_win_end]
+
+    qa_win, sa_win, ml_win, score, identity, aln_len = smith_waterman_align(
+        q_win, s_win, match, mismatch, gap_open, gap_extend
+    )
+
+    if aln_len == 0:
+        return ("", "", "", 0, 0.0, 0)
+
+    return qa_win, sa_win, ml_win, score, identity, aln_len
 
 
-def calculate_evalue(similarity, query_length, db_size=97):
-    """Estimated e-value for the simple (global) method."""
-    if similarity >= 100.0:
-        return 0.0
-    mismatches = round((1.0 - similarity / 100.0) * query_length)
-    if mismatches == 0:
-        return 0.0
-    try:
-        evalue = (db_size * math.exp(mismatches * 0.05)) / (query_length * 10)
-        return round(min(evalue, 10.0), 6)
-    except Exception:
-        return 10.0
-
-
-def calculate_evalue_aligned(score, query_length, db_size=97):
-    """Score-based estimated e-value for the Smith-Waterman local alignment."""
+def calculate_evalue(score, query_length, db_size=97, match=2):
+    """Score-based expected-value estimate for the BLAST algorithm."""
     if score <= 0:
         return 1.0
     try:
-        lam = 0.2
-        evalue = db_size * math.exp(-lam * score) / max(query_length, 1)
+        lambda_ = 2 * math.log(max(match, 2)) / 1.0  # ~per-residue scaling
+        evalue = (db_size * (query_length / 100.0)) * math.exp(-lambda_ * score)
         return round(min(max(evalue, 1e-300), 10.0), 6)
     except Exception:
         return 10.0
 
 
-def search_database(query_sequence, database_file, method="sw"):
+def search_database(query_sequence, database_file, blast_type="n"):
+    """Run the BLAST algorithm against a local database and return top hits."""
+    word_size = 11 if blast_type == "n" else 3
     database = load_database(database_file)
     results  = []
     for entry in database:
-        similarity, aln_len, evalue, _ = align_pair(query_sequence, entry["sequence"], method)
+        qa, sa, ml, score, identity, aln_len = blast_align(
+            query_sequence, entry["sequence"], word_size=word_size
+        )
+        evalue = calculate_evalue(score, len(query_sequence))
         results.append({
             "name":        entry["id"],
             "description": entry["description"],
-            "similarity":  similarity,
+            "similarity":  identity,
             "evalue":      evalue,
             "sequence":    entry["sequence"],
         })
@@ -244,36 +324,18 @@ def search_database(query_sequence, database_file, method="sw"):
     return results[:5]
 
 
-def build_alignment(query_seq, subject_seq, method="sw"):
-    """Build alignment display blocks. Uses Smith-Waterman if method == 'sw',
-    otherwise the old same-offset ('simple') comparison."""
-    if method == "sw":
-        qa, sa, ml, score = smith_waterman_align(query_seq, subject_seq)[:4]
-        query_line   = qa
-        subject_line = sa
-        match_line   = ml
-        max_len      = len(qa)
-    else:
-        max_len        = max(len(query_seq), len(subject_seq))
-        query_line     = query_seq.ljust(max_len, "-")
-        subject_line   = subject_seq.ljust(max_len, "-")
-        match_line     = ""
-        for q, s in zip(query_line, subject_line):
-            if q == "-" and s == "-":
-                match_line += " "
-            elif q == "-" or s == "-":
-                match_line += "-"
-            elif q == s:
-                match_line += "|"
-            else:
-                match_line += "*"
+def build_alignment(query_seq, subject_seq, blast_type="n"):
+    """Build alignment display blocks using the BLAST algorithm."""
+    word_size = 11 if blast_type == "n" else 3
+    qa, sa, ml, score = blast_align(query_seq, subject_seq, word_size=word_size)[:4]
+    max_len = len(qa)
 
     chunk_size = 60
     blocks = []
     for i in range(0, max_len, chunk_size):
-        q_chunk = query_line[i:i+chunk_size]
-        m_chunk = match_line[i:i+chunk_size]
-        s_chunk = subject_line[i:i+chunk_size]
+        q_chunk = qa[i:i+chunk_size]
+        m_chunk = ml[i:i+chunk_size]
+        s_chunk = sa[i:i+chunk_size]
         if q_chunk.strip("-") or s_chunk.strip("-"):
             blocks.append({
                 "query":   q_chunk,
@@ -281,7 +343,7 @@ def build_alignment(query_seq, subject_seq, method="sw"):
                 "subject": s_chunk,
                 "start":   i + 1,
             })
-    return blocks, match_line
+    return blocks, ml
 
 
 def is_protein_sequence(raw):
@@ -312,34 +374,26 @@ def dn():
 def blastinfo():
     return render_template("BlastInfo.html")
 
-def current_method():
-    m = session.get("alignment_method", "sw")
-    return m if m in ALIGNMENT_METHODS else "sw"
-
 @app.route("/blastn")
 def blastn():
     # Fresh page load — purana error clear karo
     session["blast_error"]    = ""
     session["blastn_results"] = []
-    return render_template("BlastN.html", results=[], query_sequence="", method=current_method())
+    return render_template("BlastN.html", results=[], query_sequence="")
 
 @app.route("/blastp")
 def blastp():
     # Fresh page load — purana error clear karo
     session["blast_error"]    = ""
     session["blastp_results"] = []
-    return render_template("BlastP.html", results=[], query_sequence="", method=current_method())
+    return render_template("BlastP.html", results=[], query_sequence="")
 
 
 @app.route("/runblastn", methods=["POST"])
 def runblastn():
     raw = request.form["sequence"].strip()
-    method = request.form.get("method", "sw")
-    if method not in ALIGNMENT_METHODS:
-        method = "sw"
 
     session["last_blast"]       = "n"
-    session["alignment_method"] = method
     session["blastn_results"]   = []
     session["blast_error"]      = ""
 
@@ -361,15 +415,15 @@ def runblastn():
     session["blastn_query"]   = sequence
     session["query_sequence"] = sequence
 
-    results = search_database(sequence, DATABASE_NUCLEOTIDE, method)
+    results = search_database(sequence, DATABASE_NUCLEOTIDE, "n")
     session["blastn_results"] = results
 
     top = results[0] if results else None
     add_history_entry({
         "time":       datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "blast_type": "BLASTn (DNA)",
-        "method":     "Local (Smith-Waterman)" if method == "sw" else "Global (Simple)",
-        "method_key": method,
+        "method":     "BLAST algorithm",
+        "method_key": "n",
         "query":      sequence,
         "query_len":  len(sequence),
         "top_hit":    top["name"] if top else "No match",
@@ -384,12 +438,8 @@ def runblastn():
 @app.route("/runblastp", methods=["POST"])
 def runblastp():
     raw = request.form["sequence"].strip()
-    method = request.form.get("method", "sw")
-    if method not in ALIGNMENT_METHODS:
-        method = "sw"
 
     session["last_blast"]       = "p"
-    session["alignment_method"] = method
     session["blastp_results"]   = []
     session["blast_error"]      = ""
 
@@ -411,15 +461,15 @@ def runblastp():
     session["blastp_query"]   = sequence
     session["query_sequence"] = sequence
 
-    results = search_database(sequence, DATABASE_PROTEIN, method)
+    results = search_database(sequence, DATABASE_PROTEIN, "p")
     session["blastp_results"] = results
 
     top = results[0] if results else None
     add_history_entry({
         "time":       datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "blast_type": "BLASTp (Protein)",
-        "method":     "Local (Smith-Waterman)" if method == "sw" else "Global (Simple)",
-        "method_key": method,
+        "method":     "BLAST algorithm",
+        "method_key": "p",
         "query":      sequence,
         "query_len":  len(sequence),
         "top_hit":    top["name"] if top else "No match",
@@ -433,14 +483,10 @@ def runblastp():
 
 @app.route("/blastp_results")
 def blastp_results():
-    method = request.args.get("method") or current_method()
-    if method not in ALIGNMENT_METHODS:
-        method = "sw"
-    session["alignment_method"] = method
     seq_param = request.args.get("seq", "")
     if seq_param:
         sequence = re.sub(r"[^ARNDCQEGHILKMFPSTWYVX]", "", seq_param.upper())
-        results = search_database(sequence, DATABASE_PROTEIN, method)
+        results = search_database(sequence, DATABASE_PROTEIN, "p")
         session["last_blast"]     = "p"
         session["blastp_query"]   = sequence
         session["query_sequence"] = sequence
@@ -448,18 +494,14 @@ def blastp_results():
     else:
         sequence = session.get("blastp_query", "")
         results  = session.get("blastp_results", [])
-    return render_template("BlastP.html", results=results, query_sequence=sequence, method=method)
+    return render_template("BlastP.html", results=results, query_sequence=sequence)
 
 @app.route("/blastn_results")
 def blastn_results():
-    method = request.args.get("method") or current_method()
-    if method not in ALIGNMENT_METHODS:
-        method = "sw"
-    session["alignment_method"] = method
     seq_param = request.args.get("seq", "")
     if seq_param:
         sequence = re.sub(r"[^ATGCN]", "", seq_param.upper())
-        results = search_database(sequence, DATABASE_NUCLEOTIDE, method)
+        results = search_database(sequence, DATABASE_NUCLEOTIDE, "n")
         session["last_blast"]     = "n"
         session["blastn_query"]   = sequence
         session["query_sequence"] = sequence
@@ -467,7 +509,7 @@ def blastn_results():
     else:
         sequence = session.get("blastn_query", "")
         results  = session.get("blastn_results", [])
-    return render_template("BlastN.html", results=results, query_sequence=sequence, method=method)
+    return render_template("BlastN.html", results=results, query_sequence=sequence)
 
 
 @app.route("/details/<name>")
@@ -513,10 +555,13 @@ def details(name):
 
     hit = None
     if query_seq and subject_seq:
-        similarity, aln_len, evalue, _ = align_pair(query_seq, subject_seq, current_method())
-        hit = {"similarity": similarity, "evalue": evalue, "aln_len": aln_len}
+        qa, sa, ml, score, identity, aln_len = blast_align(
+            query_seq, subject_seq, word_size=(11 if blast_type == "n" else 3)
+        )
+        evalue = calculate_evalue(score, len(query_seq))
+        hit = {"similarity": identity, "evalue": evalue, "aln_len": aln_len}
 
-    alignment_blocks, match_line = build_alignment(query_seq, subject_seq, current_method())
+    alignment_blocks, match_line = build_alignment(query_seq, subject_seq, blast_type)
 
     alphafold_url = NDM_ALPHAFOLD_LINKS.get(name, "")
     pdb_url       = NDM_PDB_LINKS.get(name, "")
