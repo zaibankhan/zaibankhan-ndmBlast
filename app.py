@@ -406,10 +406,10 @@ def runblastn():
 
     sequence = re.sub(r"[^ATGCN]", "", raw.upper())
 
-    if len(sequence) < 50:
+    if len(sequence) < 20:
         session["blastn_query"]   = ""
         session["query_sequence"] = ""
-        session["blast_error"]    = "⚠️ Sequence bahut chhoti hai! Minimum 50 nucleotides required."
+        session["blast_error"]    = "⚠️ Insufficient Sequence Length: Please enter a nucleotide sequence containing at least 20 bp to proceed with the analysis."
         return redirect(url_for("blastn_results"))
 
     session["blastn_query"]   = sequence
