@@ -85,6 +85,11 @@
   }
   hr.divider { border: none; height: 1px; background: var(--line); width: 90%; margin: 10px auto; }
 
+  .navbar { background: var(--card); border-bottom: 1px solid var(--line); padding: 10px 32px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .navlink { text-decoration: none; color: var(--muted); padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; transition: all .15s ease; }
+  .navlink:hover { color: var(--brand); background: #f1f5f9; }
+  .navlink.active { color: #fff; background: var(--brand); }
+
   /* Nav cards */
   .nav-cards {
     display: flex; gap: 22px; justify-content: center;
@@ -147,6 +152,15 @@
     </div>
   </div>
   <button id="shareBtn" class="share-btn" onclick="shareThisPage()">Share</button>
+</div>
+
+<div class="navbar">
+  <a class="navlink active" href="/">Home</a>
+  <a class="navlink" href="/blastn">BLASTn &mdash; NDM</a>
+  <a class="navlink" href="/blastp">BLASTp &mdash; NDM</a>
+  <a class="navlink" href="/dn">NDM Info</a>
+  <a class="navlink" href="/history">History</a>
+  <a class="navlink" href="/blastinfo">About</a>
 </div>
 
 <div class="hero">
