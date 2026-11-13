@@ -1,11 +1,22 @@
-from flask import Flask, render_template, request, session, redirect, url_for
+from flask import Flask, render_template, request, session, redirect, url_for, Response, flash
 from Bio import SeqIO
+import csv
+import io
 import re
+import smtplib
 import sqlite3
 import math
 import json
 import os
 from datetime import datetime
+from email.message import EmailMessage
+
+# Optional: load a local .env file for email settings (never committed).
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+except Exception:
+    pass
 
 
 # ── NDM VARIANT STRUCTURE LINKS ───────────────────────────────────────────────
@@ -510,6 +521,183 @@ def blastn_results():
         sequence = session.get("blastn_query", "")
         results  = session.get("blastn_results", [])
     return render_template("BlastN.html", results=results, query_sequence=sequence)
+
+
+# ── SAVE / EXPORT (CSV download + email attachment) ───────────────────────────
+def _clean_sequence(blast_type, raw):
+    raw = (raw or "").upper()
+    if blast_type == "n":
+        return re.sub(r"[^ATGCN]", "", raw)
+    return re.sub(r"[^ARNDCQEGHILKMFPSTWYVX]", "", raw)
+
+
+def _current_results(blast_type, seq_param=""):
+    """Return (sequence, results) for the requested BLAST type.
+
+    When a sequence is supplied we recompute from the local database;
+    otherwise we fall back to whatever is stored in the session.
+    """
+    if blast_type == "n":
+        sequence = _clean_sequence("n", seq_param or session.get("blastn_query", ""))
+        if seq_param:
+            results = search_database(sequence, DATABASE_NUCLEOTIDE, "n")
+        else:
+            results = session.get("blastn_results", [])
+    else:
+        sequence = _clean_sequence("p", seq_param or session.get("blastp_query", ""))
+        if seq_param:
+            results = search_database(sequence, DATABASE_PROTEIN, "p")
+        else:
+            results = session.get("blastp_results", [])
+    return sequence, results
+
+
+def build_results_csv(blast_type, sequence, results):
+    """Build the results CSV as text."""
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    label = "BLASTn (DNA)" if blast_type == "n" else "BLASTp (Protein)"
+    writer.writerow(["NDM-BLAST Search Results"])
+    writer.writerow(["Search type", label])
+    writer.writerow(["Query length", len(sequence)])
+    writer.writerow(["Generated", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+    writer.writerow([])
+    writer.writerow(["NDM Variant", "Identity (%)", "E-value", "Description", "Sequence"])
+    for item in results:
+        writer.writerow([
+            item.get("name", ""),
+            item.get("similarity", ""),
+            item.get("evalue", ""),
+            item.get("description", ""),
+            item.get("sequence", ""),
+        ])
+    return buf.getvalue()
+
+
+def build_history_csv(records):
+    """Build the search-history CSV as text."""
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["NDM-BLAST Search History"])
+    writer.writerow(["Generated", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+    writer.writerow(["Total searches", len(records)])
+    writer.writerow([])
+    writer.writerow(["Time", "Type", "Query", "Query Length", "Top Hit", "Identity (%)", "E-value"])
+    for r in records:
+        writer.writerow([
+            r.get("time", ""),
+            r.get("blast_type", ""),
+            r.get("query", ""),
+            r.get("query_len", ""),
+            r.get("top_hit", ""),
+            r.get("identity", ""),
+            r.get("evalue", ""),
+        ])
+    return buf.getvalue()
+
+
+def _csv_response(text, filename):
+    """Return a CSV download with a UTF-8 BOM so Excel opens it correctly."""
+    return Response(
+        "\ufeff" + text,
+        mimetype="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="%s"' % filename},
+    )
+
+
+def _mail_config():
+    return {
+        "host":     os.environ.get("NDM_MAIL_HOST", "smtp.gmail.com").strip(),
+        "port":     int(os.environ.get("NDM_MAIL_PORT", "587")),
+        "user":     os.environ.get("NDM_MAIL_USER", "").strip(),
+        "password": os.environ.get("NDM_MAIL_PASSWORD", "").strip(),
+        "sender":   (os.environ.get("NDM_MAIL_FROM") or os.environ.get("NDM_MAIL_USER", "")).strip(),
+        "use_tls":  os.environ.get("NDM_MAIL_USE_TLS", "1").strip().lower() not in ("0", "false", "no"),
+    }
+
+
+def _results_url(blast_type, sequence):
+    if blast_type == "n":
+        return url_for("blastn_results", seq=sequence)
+    return url_for("blastp_results", seq=sequence)
+
+
+@app.route("/save/csv")
+def save_csv():
+    """Download the current results (or history) as a CSV file."""
+    kind = request.args.get("kind", "results")
+    if kind == "history":
+        return _csv_response(build_history_csv(load_history()), "ndm_blast_history.csv")
+
+    blast_type = request.args.get("type") or session.get("last_blast", "p")
+    if blast_type not in ("n", "p"):
+        blast_type = "p"
+    sequence, results = _current_results(blast_type, request.args.get("seq", ""))
+    filename = "ndm_blast_%s_results.csv" % ("nucleotide" if blast_type == "n" else "protein")
+    return _csv_response(build_results_csv(blast_type, sequence, results), filename)
+
+
+@app.route("/save/email", methods=["POST"])
+def save_email():
+    """Email the current results (or history) as a CSV attachment."""
+    kind = request.form.get("kind", "results")
+    blast_type = request.form.get("type", "p")
+    if blast_type not in ("n", "p"):
+        blast_type = "p"
+    sequence = ""
+
+    if kind == "history":
+        csv_text = build_history_csv(load_history())
+        filename = "ndm_blast_history.csv"
+        back = url_for("history")
+        subject = "Your NDM-BLAST search history (CSV)"
+    else:
+        sequence, results = _current_results(blast_type, request.form.get("seq", ""))
+        csv_text = build_results_csv(blast_type, sequence, results)
+        filename = "ndm_blast_%s_results.csv" % ("nucleotide" if blast_type == "n" else "protein")
+        back = _results_url(blast_type, sequence)
+        subject = "Your NDM-BLAST results (CSV)"
+
+    email_addr = (request.form.get("email") or "").strip()
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email_addr):
+        flash("Please enter a valid email address.", "error")
+        return redirect(back)
+
+    cfg = _mail_config()
+    if not cfg["user"] or not cfg["password"]:
+        flash(
+            "Email is not configured on the server yet. Set NDM_MAIL_USER and "
+            "NDM_MAIL_PASSWORD (and optionally NDM_MAIL_HOST / NDM_MAIL_PORT) "
+            "to enable sending.",
+            "error",
+        )
+        return redirect(back)
+
+    try:
+        msg = EmailMessage()
+        msg["Subject"] = subject
+        msg["From"] = cfg["sender"] or cfg["user"]
+        msg["To"] = email_addr
+        msg.set_content(
+            "Hello,\n\nPlease find your NDM-BLAST data attached as a CSV file.\n\n"
+            "This report was generated locally by the NDM-BLAST application.\n"
+        )
+        msg.add_attachment(
+            csv_text.encode("utf-8-sig"),
+            maintype="text",
+            subtype="csv",
+            filename=filename,
+        )
+        with smtplib.SMTP(cfg["host"], cfg["port"], timeout=25) as server:
+            if cfg["use_tls"]:
+                server.starttls()
+            server.login(cfg["user"], cfg["password"])
+            server.send_message(msg)
+        flash("Done! Your CSV file was emailed to %s." % email_addr, "ok")
+    except Exception as exc:
+        flash("Could not send the email: %s" % exc, "error")
+
+    return redirect(back)
 
 
 @app.route("/details/<name>")

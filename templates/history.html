@@ -61,6 +61,8 @@
   .clear-form { margin-left: auto; }
   .clear-btn { background: #fff; color: var(--danger); border: 1px solid #f0b6b1; border-radius: 9px; padding: 9px 18px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .15s ease; }
   .clear-btn:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+  .head-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .head-actions .clear-form { margin-left: 0; }
 
   .legend { margin: 14px 0 0; font-size: 12px; color: var(--muted); }
 </style>
@@ -94,11 +96,25 @@
       <p class="page-sub">Your past BLAST searches, stored locally on this machine.</p>
     </div>
     {% if count %}
-    <form class="clear-form" method="POST" action="/clear_history" onsubmit="return confirm('Clear all search history?');">
-      <button type="submit" class="clear-btn">Clear History</button>
-    </form>
+    <div class="head-actions">
+      {% set save_kind = 'history' %}{% set save_type = 'p' %}{% set save_seq = '' %}
+      {% include "_save_button.html" %}
+      <form class="clear-form" method="POST" action="/clear_history" onsubmit="return confirm('Clear all search history?');">
+        <button type="submit" class="clear-btn">Clear History</button>
+      </form>
+    </div>
     {% endif %}
   </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="flash-stack">
+    {% for category, message in messages %}
+    <div class="flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
 
   {% if records %}
   <div class="card" style="padding:0; overflow:hidden;">

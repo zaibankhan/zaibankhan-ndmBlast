@@ -1,0 +1,125 @@
+{# Reusable Save dropdown: CSV download + email delivery.
+   Expects (all optional): save_kind ('results'|'history'), save_type ('n'|'p'), save_seq #}
+{% set save_kind = save_kind | default('results') %}
+{% set save_type = save_type | default('p') %}
+{% set save_seq  = save_seq  | default('') %}
+<style>
+  .save-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .save-wrap { position: relative; }
+  .save-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #fff; border: 1px solid var(--line); color: var(--brand);
+    padding: 10px 18px; border-radius: 9px; font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: all .15s ease; white-space: nowrap;
+  }
+  .save-btn:hover { border-color: var(--accent); color: var(--accent); box-shadow: 0 4px 14px rgba(14,159,143,0.15); }
+  .save-btn .caret { font-size: 11px; opacity: .8; }
+  .save-menu {
+    display: none; position: absolute; right: 0; top: calc(100% + 8px); z-index: 60;
+    min-width: 220px; background: #fff; border: 1px solid var(--line);
+    border-radius: 12px; box-shadow: 0 14px 34px rgba(20,40,70,0.16);
+    padding: 6px; overflow: hidden;
+  }
+  .save-menu.open { display: block; }
+  .save-item {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    background: none; border: none; text-align: left; text-decoration: none;
+    color: var(--ink); font-size: 14px; font-weight: 600; font-family: inherit;
+    padding: 11px 13px; border-radius: 8px; cursor: pointer; transition: background .12s ease;
+  }
+  .save-item:hover { background: var(--accent-soft); color: var(--accent); }
+
+  .email-modal {
+    display: none; position: fixed; inset: 0; z-index: 9000;
+    background: rgba(20, 35, 55, 0.45); backdrop-filter: blur(2px);
+    justify-content: center; align-items: center; padding: 20px;
+  }
+  .email-modal.open { display: flex; }
+  .email-box {
+    width: 100%; max-width: 420px; background: #fff; border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(20,40,70,0.30); padding: 26px 26px 22px;
+    animation: savePop .18s ease;
+  }
+  @keyframes savePop { from { transform: translateY(10px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
+  .email-box h3 { margin: 0 0 6px; font-size: 19px; color: var(--brand); }
+  .email-box p { margin: 0 0 18px; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+  .email-box input[type="email"] {
+    width: 100%; border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; font-size: 14px; color: var(--ink); font-family: inherit;
+  }
+  .email-box input[type="email"]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(14,159,143,0.15); }
+  .email-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+  .email-actions button { border: none; border-radius: 9px; padding: 10px 20px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  .email-cancel { background: #eef1f6; color: var(--muted); }
+  .email-cancel:hover { background: #e3e8f0; }
+  .email-send { background: linear-gradient(135deg, var(--brand), var(--accent)); color: #fff; box-shadow: 0 6px 16px rgba(31,78,120,0.25); }
+  .email-send:hover { transform: translateY(-1px); }
+
+  .flash-stack { margin: 0 0 18px; display: flex; flex-direction: column; gap: 10px; }
+  .flash { border-radius: 10px; padding: 13px 16px; font-size: 14px; font-weight: 600; }
+  .flash.ok { background: #e9f7ef; border: 1px solid #b7e4c7; color: #17603f; }
+  .flash.error { background: #fdecec; border: 1px solid #f5b6b1; color: #b3261e; }
+</style>
+
+<div class="save-wrap">
+  <button type="button" class="save-btn" id="saveToggle" aria-haspopup="true" aria-expanded="false"
+          onclick="ndmToggleSave(event)">
+    &#128190; Save <span class="caret">&#9662;</span>
+  </button>
+  <div class="save-menu" id="saveMenu" role="menu">
+    <a class="save-item" role="menuitem"
+       href="{{ url_for('save_csv', kind=save_kind, type=save_type, seq=save_seq) }}">
+      &#11015;&#65039; Download as CSV
+    </a>
+    <button type="button" class="save-item" role="menuitem" onclick="ndmOpenEmail()">
+      &#9993;&#65039; Send to Email
+    </button>
+  </div>
+</div>
+
+<div class="email-modal" id="emailModal" onclick="if(event.target===this)ndmCloseEmail()">
+  <div class="email-box">
+    <h3>Send CSV to email</h3>
+    <p>Enter your email address and we'll send this data as a CSV attachment.</p>
+    <form method="POST" action="{{ url_for('save_email') }}">
+      <input type="hidden" name="kind" value="{{ save_kind }}">
+      <input type="hidden" name="type" value="{{ save_type }}">
+      <input type="hidden" name="seq" value="{{ save_seq }}">
+      <input type="email" name="email" placeholder="you@example.com" required autocomplete="email">
+      <div class="email-actions">
+        <button type="button" class="email-cancel" onclick="ndmCloseEmail()">Cancel</button>
+        <button type="submit" class="email-send">Send</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function ndmToggleSave(e) {
+    e.stopPropagation();
+    var m = document.getElementById('saveMenu');
+    var t = document.getElementById('saveToggle');
+    var open = m.classList.toggle('open');
+    t.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function ndmOpenEmail() {
+    document.getElementById('saveMenu').classList.remove('open');
+    document.getElementById('emailModal').classList.add('open');
+    var input = document.querySelector('#emailModal input[type="email"]');
+    if (input) { input.value = ''; setTimeout(function(){ input.focus(); }, 40); }
+  }
+  function ndmCloseEmail() {
+    document.getElementById('emailModal').classList.remove('open');
+  }
+  document.addEventListener('click', function (e) {
+    var menu = document.getElementById('saveMenu');
+    if (menu && menu.classList.contains('open') && !e.target.closest('.save-wrap')) {
+      menu.classList.remove('open');
+      var t = document.getElementById('saveToggle');
+      if (t) t.setAttribute('aria-expanded', 'false');
+    }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { ndmCloseEmail(); var m = document.getElementById('saveMenu'); if (m) m.classList.remove('open'); }
+  });
+</script>

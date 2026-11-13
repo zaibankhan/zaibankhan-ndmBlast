@@ -24,6 +24,7 @@ This project was developed as part of my **M.Sc. Bioinformatics** coursework at 
 - 📝 Variant Details Page
 - 🌐 User-friendly Web Interface
 - ⚡ Fast Local Sequence Search
+- 💾 Save Results & History (CSV download or email attachment)
 
 ---
 
@@ -88,6 +89,36 @@ python app.py
 ```text
 http://127.0.0.1:5000
 ```
+
+---
+
+## 💾 Save / Export
+
+Every results page and the History page has a **Save** button with two options:
+
+- **Download as CSV** — downloads the data straight to your device.
+- **Send to Email** — enter an address and the data is emailed as a CSV attachment.
+
+Results exports include: NDM Variant, Identity (%), E-value, Description, Sequence.
+History exports include: Time, Type, Query, Query Length, Top Hit, Identity, E-value.
+
+### Enabling email delivery
+
+Email sending is optional and needs a mail account. Copy `.env.example` to
+`.env` and fill in your details (the `.env` file is git-ignored):
+
+```text
+NDM_MAIL_HOST=smtp.gmail.com
+NDM_MAIL_PORT=587
+NDM_MAIL_USE_TLS=1
+NDM_MAIL_USER=your.address@gmail.com
+NDM_MAIL_PASSWORD=your-16-character-app-password
+NDM_MAIL_FROM=your.address@gmail.com
+```
+
+> **Gmail:** use an *App Password* (Google Account → Security → App passwords),
+> not your normal password. Until an account is configured, the "Send to Email"
+> option shows a message explaining what needs to be set.
 
 ---
 

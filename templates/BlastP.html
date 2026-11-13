@@ -114,7 +114,23 @@
     {% endif %}
   </div>
 
-  <div class="result-count">Total Results: {{ results|length }}</div>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="flash-stack">
+    {% for category, message in messages %}
+    <div class="flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
+
+  <div class="save-bar" style="justify-content: space-between; margin: 24px 0 12px;">
+    <div class="result-count" style="margin: 0;">Total Results: {{ results|length }}</div>
+    {% if results %}
+    {% set save_kind = 'results' %}{% set save_type = 'p' %}{% set save_seq = query_sequence %}
+    {% include "_save_button.html" %}
+    {% endif %}
+  </div>
 
   {% if results %}
   <div class="card" style="padding:0; overflow:hidden;">
