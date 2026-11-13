@@ -141,7 +141,7 @@
       <div class="stat"><div class="s-val">{{ hit.score }}</div><div class="s-key">Score</div></div>
       <div class="stat"><div class="s-val">{{ hit.similarity }}%</div><div class="s-key">Identity</div></div>
       <div class="stat"><div class="s-val">{{ hit.coverage }}%</div><div class="s-key">Query Coverage</div></div>
-      <div class="stat"><div class="s-val">{{ hit.evalue }}</div><div class="s-key">E-value</div></div>
+      <div class="stat"><div class="s-val">{{ hit.evalue|evalue }}</div><div class="s-key">E-value</div></div>
       <div class="stat"><div class="s-val">{{ query_length }}</div><div class="s-key">Query Length</div></div>
       <div class="stat"><div class="s-val">{{ subject_length }}</div><div class="s-key">Subject Length</div></div>
       {% if hit.aln_len %}<div class="stat"><div class="s-val">{{ hit.aln_len }}</div><div class="s-key">Alignment Length</div></div>{% endif %}

@@ -309,9 +309,29 @@ def calculate_evalue(score, query_length, db_size=97, match=2):
     try:
         lambda_ = 2 * math.log(max(match, 2)) / 1.0  # ~per-residue scaling
         evalue = (db_size * (query_length / 100.0)) * math.exp(-lambda_ * score)
-        return round(min(max(evalue, 1e-300), 10.0), 6)
+        evalue = min(max(evalue, 1e-300), 10.0)
+        # Keep ~3 significant digits so very small E-values are not lost.
+        return float("%.3g" % evalue)
     except Exception:
         return 10.0
+
+
+def format_evalue(value):
+    """Human-friendly E-value: scientific notation for very small values."""
+    if value is None or value == "":
+        return ""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if v <= 0:
+        return "0.0"
+    if v < 0.001:
+        return "%.2e" % v
+    return "%g" % round(v, 4)
+
+
+app.template_filter("evalue")(format_evalue)
 
 
 def query_coverage(q_alignment, query_length):
@@ -583,7 +603,7 @@ def build_results_csv(blast_type, sequence, results):
             item.get("score", ""),
             item.get("similarity", ""),
             item.get("coverage", ""),
-            item.get("evalue", ""),
+            format_evalue(item.get("evalue", "")),
             item.get("description", ""),
             item.get("sequence", ""),
         ])
@@ -607,7 +627,7 @@ def build_history_csv(records):
             r.get("query_len", ""),
             r.get("top_hit", ""),
             r.get("identity", ""),
-            r.get("evalue", ""),
+            format_evalue(r.get("evalue", "")),
         ])
     return buf.getvalue()
 

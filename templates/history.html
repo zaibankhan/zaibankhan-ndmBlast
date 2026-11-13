@@ -147,7 +147,7 @@
             {% endif %}
           </td>
           <td>{% if r.identity is not none %}{{ r.identity }}%{% else %}&mdash;{% endif %}</td>
-          <td>{% if r.evalue is not none %}{{ r.evalue }}{% else %}&mdash;{% endif %}</td>
+          <td>{% if r.evalue is not none %}{{ r.evalue|evalue }}{% else %}&mdash;{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
