@@ -73,6 +73,7 @@
   table.results a { color: var(--brand); font-weight: 700; text-decoration: none; }
   table.results a:hover { text-decoration: underline; }
   .var-chip { display: inline-block; background: var(--accent-soft); color: var(--accent); font-weight: 700; padding: 3px 10px; border-radius: 999px; font-size: 12px; }
+  .var-chip.cov { background: #eef2ff; color: #3b4fb8; }
   .detail-box { max-height: 160px; overflow: auto; background: #f8fafc; border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-family: "Consolas", monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
 
   footer { text-align: center; padding: 20px; color: var(--muted); font-size: 13px; background: var(--card); border-top: 1px solid var(--line); }
@@ -150,7 +151,7 @@
     <table class="results">
       <thead>
         <tr>
-          <th>NDM Variant</th><th>Identity (%)</th><th>E-value</th>
+          <th>NDM Variant</th><th>Identity (%)</th><th>Query Coverage (%)</th><th>E-value</th>
           <th>Description</th><th>Sequence</th>
         </tr>
       </thead>
@@ -159,6 +160,7 @@
         <tr>
           <td><a href="/details/{{ item.name }}?type=n&seq={{ query_sequence }}">{{ item.name }}</a></td>
           <td><span class="var-chip">{{ item.similarity }}%</span></td>
+          <td><span class="var-chip cov">{{ item.coverage }}%</span></td>
           <td>{{ item.evalue }}</td>
           <td>{{ item.description }}</td>
           <td>

@@ -314,6 +314,17 @@ def calculate_evalue(score, query_length, db_size=97, match=2):
         return 10.0
 
 
+def query_coverage(q_alignment, query_length):
+    """Percentage of the query sequence that is covered by the alignment.
+
+    Gaps in the aligned query are not query residues, so they are excluded.
+    """
+    if not query_length or not q_alignment:
+        return 0.0
+    aligned_query_residues = sum(1 for ch in q_alignment if ch != "-")
+    return round((aligned_query_residues / query_length) * 100, 2)
+
+
 def search_database(query_sequence, database_file, blast_type="n"):
     """Run the BLAST algorithm against a local database and return top hits."""
     word_size = 11 if blast_type == "n" else 3
@@ -328,6 +339,7 @@ def search_database(query_sequence, database_file, blast_type="n"):
             "name":        entry["id"],
             "description": entry["description"],
             "similarity":  identity,
+            "coverage":    query_coverage(qa, len(query_sequence)),
             "evalue":      evalue,
             "sequence":    entry["sequence"],
         })
@@ -562,11 +574,12 @@ def build_results_csv(blast_type, sequence, results):
     writer.writerow(["Query length", len(sequence)])
     writer.writerow(["Generated", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
     writer.writerow([])
-    writer.writerow(["NDM Variant", "Identity (%)", "E-value", "Description", "Sequence"])
+    writer.writerow(["NDM Variant", "Identity (%)", "Query Coverage (%)", "E-value", "Description", "Sequence"])
     for item in results:
         writer.writerow([
             item.get("name", ""),
             item.get("similarity", ""),
+            item.get("coverage", ""),
             item.get("evalue", ""),
             item.get("description", ""),
             item.get("sequence", ""),
@@ -747,7 +760,12 @@ def details(name):
             query_seq, subject_seq, word_size=(11 if blast_type == "n" else 3)
         )
         evalue = calculate_evalue(score, len(query_seq))
-        hit = {"similarity": identity, "evalue": evalue, "aln_len": aln_len}
+        hit = {
+            "similarity": identity,
+            "coverage":   query_coverage(qa, len(query_seq)),
+            "evalue":     evalue,
+            "aln_len":    aln_len,
+        }
 
     alignment_blocks, match_line = build_alignment(query_seq, subject_seq, blast_type)
 
