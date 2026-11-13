@@ -338,12 +338,14 @@ def search_database(query_sequence, database_file, blast_type="n"):
         results.append({
             "name":        entry["id"],
             "description": entry["description"],
+            "score":       score,
             "similarity":  identity,
             "coverage":    query_coverage(qa, len(query_sequence)),
             "evalue":      evalue,
             "sequence":    entry["sequence"],
         })
-    results.sort(key=lambda x: x["similarity"], reverse=True)
+    # BLAST convention: rank by alignment score, then identity as a tie-break.
+    results.sort(key=lambda x: (x["score"], x["similarity"]), reverse=True)
     return results[:5]
 
 
@@ -574,10 +576,11 @@ def build_results_csv(blast_type, sequence, results):
     writer.writerow(["Query length", len(sequence)])
     writer.writerow(["Generated", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
     writer.writerow([])
-    writer.writerow(["NDM Variant", "Identity (%)", "Query Coverage (%)", "E-value", "Description", "Sequence"])
+    writer.writerow(["NDM Variant", "Score", "Identity (%)", "Query Coverage (%)", "E-value", "Description", "Sequence"])
     for item in results:
         writer.writerow([
             item.get("name", ""),
+            item.get("score", ""),
             item.get("similarity", ""),
             item.get("coverage", ""),
             item.get("evalue", ""),
@@ -763,6 +766,7 @@ def details(name):
         hit = {
             "similarity": identity,
             "coverage":   query_coverage(qa, len(query_seq)),
+            "score":      score,
             "evalue":     evalue,
             "aln_len":    aln_len,
         }

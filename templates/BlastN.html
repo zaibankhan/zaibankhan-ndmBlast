@@ -151,7 +151,7 @@
     <table class="results">
       <thead>
         <tr>
-          <th>NDM Variant</th><th>Identity (%)</th><th>Query Coverage (%)</th><th>E-value</th>
+          <th>NDM Variant</th><th>Score</th><th>Identity (%)</th><th>Query Coverage (%)</th><th>E-value</th>
           <th>Description</th><th>Sequence</th>
         </tr>
       </thead>
@@ -159,6 +159,7 @@
         {% for item in results %}
         <tr>
           <td><a href="/details/{{ item.name }}?type=n&seq={{ query_sequence }}">{{ item.name }}</a></td>
+          <td><strong>{{ item.score }}</strong></td>
           <td><span class="var-chip">{{ item.similarity }}%</span></td>
           <td><span class="var-chip cov">{{ item.coverage }}%</span></td>
           <td>{{ item.evalue }}</td>
