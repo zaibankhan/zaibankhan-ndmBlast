@@ -137,15 +137,87 @@ def calculate_similarity(query, target):
     return round((matches / length) * 100, 2)
 
 
-def smith_waterman_align(query, subject, match=2, mismatch=-1, gap_open=-2, gap_extend=-1):
+# ── NCBI BLAST scoring & statistics ──────────────────────────────────────────
+# BLOSUM62 substitution matrix (standard NCBI order). Used for protein (BLASTp).
+_BLOSUM62_ORDER = "ARNDCQEGHILKMFPSTWYV"
+_BLOSUM62_ROWS = [
+    " 4 -1 -2 -2  0 -1 -1  0 -2 -1 -1 -1 -1 -2 -1  1  0 -3 -2  0",
+    "-1  5  0 -2 -3  1  0 -2  0 -3 -2  2 -1 -3 -2 -1 -1 -3 -2 -3",
+    "-2  0  6  1 -3  0  0  0  1 -3 -3  0 -2 -3 -2  1  0 -4 -2 -3",
+    "-2 -2  1  6 -3  0  2 -1 -1 -3 -4 -1 -3 -3 -1  0 -1 -4 -3 -3",
+    " 0 -3 -3 -3  9 -3 -4 -3 -3 -1 -1 -3 -1 -2 -3 -1 -1 -2 -2 -1",
+    "-1  1  0  0 -3  5  2 -2  0 -3 -2  1  0 -3 -1  0 -1 -2 -1 -2",
+    "-1  0  0  2 -4  2  5 -2  0 -3 -3  1 -2 -3 -1  0 -1 -3 -2 -2",
+    " 0 -2  0 -1 -3 -2 -2  6 -2 -4 -4 -2 -3 -3 -2  0 -2 -2 -3 -3",
+    "-2  0  1 -1 -3  0  0 -2  8 -3 -3 -1 -2 -1 -2 -1 -2 -2  2 -3",
+    "-1 -3 -3 -3 -1 -3 -3 -4 -3  4  2 -3  1  0 -3 -2 -1 -3 -1  3",
+    "-1 -2 -3 -4 -1 -2 -3 -4 -3  2  4 -2  2  0 -3 -2 -1 -2 -1  1",
+    "-1  2  0 -1 -3  1  1 -2 -1 -3 -2  5 -1 -3 -1  0 -1 -3 -2 -2",
+    "-1 -1 -2 -3 -1  0 -2 -3 -2  1  2 -1  5  0 -2 -1 -1 -1 -1  1",
+    "-2 -3 -3 -3 -2 -3 -3 -3 -1  0  0 -3  0  6 -4 -2 -2  1  3 -1",
+    "-1 -2 -2 -1 -3 -1 -1 -2 -2 -3 -3 -1 -2 -4  7 -1 -1 -4 -3 -2",
+    " 1 -1  1  0 -1  0  0  0 -1 -2 -2  0 -1 -2 -1  4  1 -3 -2 -2",
+    " 0 -1  0 -1 -1 -1 -1 -2 -2 -1 -1 -1 -1 -2 -1  1  5 -2 -2  0",
+    "-3 -3 -4 -4 -2 -2 -3 -2 -2 -3 -2 -3 -1  1 -4 -3 -2 11  2 -3",
+    "-2 -2 -2 -3 -2 -1 -2 -3  2 -1 -1 -2 -1  3 -3 -2 -2  2  7 -1",
+    " 0 -3 -3 -3 -1 -2 -2 -3 -3  3  1 -2  1 -1 -2 -2  0 -3 -1  4",
+]
+BLOSUM62 = {}
+for _i, _a in enumerate(_BLOSUM62_ORDER):
+    _vals = [int(x) for x in _BLOSUM62_ROWS[_i].split()]
+    for _j, _b in enumerate(_BLOSUM62_ORDER):
+        BLOSUM62[(_a, _b)] = _vals[_j]
+
+
+def blosum62_score(a, b):
+    """BLOSUM62 score for an amino-acid pair; unknown residues score -1 (like X)."""
+    return BLOSUM62.get((a, b), -1)
+
+
+# NCBI BLAST defaults:
+#   BLASTn: reward 2, penalty -3, gap open 5, gap extend 2
+#           -> lambda = 0.625, K = 0.41  (gapped statistics)
+#   BLASTp: BLOSUM62, gap open 11, gap extend 1
+#           -> lambda = 0.267, K = 0.041 (gapped statistics)
+SCORING_SCHEMES = {
+    "n": {
+        "word_size": 11, "match": 2, "mismatch": -3,
+        "gap_open": 5, "gap_extend": 2, "x_drop": 20,
+        "score_fn": None, "lambda": 0.625, "K": 0.41,
+    },
+    "p": {
+        "word_size": 3, "match": 0, "mismatch": 0,
+        "gap_open": 11, "gap_extend": 1, "x_drop": 15,
+        "score_fn": blosum62_score, "lambda": 0.267, "K": 0.041,
+    },
+}
+
+
+def scheme_for(blast_type):
+    return SCORING_SCHEMES["n" if blast_type == "n" else "p"]
+
+
+def smith_waterman_align(query, subject, match=2, mismatch=-3, gap_open=5,
+                         gap_extend=2, score_fn=None):
     """Gapped local alignment (Smith-Waterman, affine gap penalty).
     Used to refine the region found by the BLAST seed-and-extend step.
+
+    When ``score_fn`` is given (e.g. BLOSUM62 for proteins) it replaces the
+    simple match/mismatch scoring.
 
     Returns (q_ali, s_ali, match_line, score, identity_pct, aln_len).
     """
     n, m = len(query), len(subject)
     if n == 0 or m == 0:
         return ("", "", "", 0, 0.0, 0)
+
+    if score_fn is None:
+        def score_fn(a, b):
+            return match if a == b else mismatch
+
+    # Gap costs are stored as positive magnitudes (NCBI convention); subtract them.
+    gap_open = -abs(gap_open)
+    gap_extend = -abs(gap_extend)
 
     # Affine-gap dynamic programming matrices
     H = [[0] * (m + 1) for _ in range(n + 1)]  # best score ending at (i,j)
@@ -159,7 +231,7 @@ def smith_waterman_align(query, subject, match=2, mismatch=-1, gap_open=-2, gap_
         for j in range(1, m + 1):
             E[i][j] = max(H[i-1][j] + gap_open, E[i-1][j] + gap_extend)
             F[i][j] = max(H[i][j-1] + gap_open, F[i][j-1] + gap_extend)
-            diag = H[i-1][j-1] + (match if query[i-1] == subject[j-1] else mismatch)
+            diag = H[i-1][j-1] + score_fn(query[i-1], subject[j-1])
             best = max(0, diag, E[i][j], F[i][j])
             H[i][j] = best
             if best == diag:
@@ -212,13 +284,86 @@ def build_word_index(seq, w):
     return index
 
 
-def blast_align(query, subject, word_size=11, match=2, mismatch=-1,
-                gap_open=-2, gap_extend=-1, x_drop=5):
+def blast_hsp(query, subject, word_size=11, match=2, mismatch=-3,
+              x_drop=20, score_fn=None):
+    """Step 1 + 2 of BLAST: seed with exact k-mers and extend ungapped.
+
+    Returns the best HSP as (score, q_start, q_end, s_start, s_end), or None
+    when no seed is found.
+    """
+    n, m = len(query), len(subject)
+    if n < word_size or m < word_size:
+        return None
+
+    if score_fn is None:
+        def score_fn(a, b):
+            return match if a == b else mismatch
+
+    q_index = build_word_index(query, word_size)
+    best_hsp = None
+
+    # Seeds that lie on the same diagonal (qi - sj) cover the same stretch of
+    # sequence, so BLAST extends each diagonal only once.
+    diagonals = {}
+    for sj in range(0, m - word_size + 1):
+        positions = q_index.get(subject[sj:sj+word_size])
+        if not positions:
+            continue
+        for qi in positions:
+            diagonals.setdefault(qi - sj, (qi, sj))
+
+    for qi, si in diagonals.values():
+        # score of the seed itself (sum of substitution scores)
+        seed = sum(score_fn(query[qi + t], subject[si + t]) for t in range(word_size))
+
+        # --- extend right ---
+        score = seed
+        best_score = seed
+        best_off = 0
+        off = 0
+        while qi + word_size + off < n and si + word_size + off < m:
+            score += score_fn(query[qi + word_size + off], subject[si + word_size + off])
+            off += 1
+            if score > best_score:
+                best_score = score
+                best_off = off
+            if score < best_score - x_drop:
+                break
+        right_end_q = qi + word_size + best_off
+        right_end_s = si + word_size + best_off
+        right_score = best_score
+
+        # --- extend left ---
+        score = right_score
+        best_score_left = right_score
+        best_off_left = 0
+        off = 0
+        while qi - 1 - off >= 0 and si - 1 - off >= 0:
+            score += score_fn(query[qi - 1 - off], subject[si - 1 - off])
+            off += 1
+            if score > best_score_left:
+                best_score_left = score
+                best_off_left = off
+            if score < best_score_left - x_drop:
+                break
+        q_start = qi - best_off_left
+        s_start = si - best_off_left
+        hsp = (best_score_left, q_start, right_end_q, s_start, right_end_s)
+        if best_hsp is None or hsp[0] > best_hsp[0]:
+            best_hsp = hsp
+
+    return best_hsp
+
+
+def blast_align(query, subject, word_size=11, match=2, mismatch=-3,
+                gap_open=5, gap_extend=2, x_drop=20, score_fn=None):
     """BLAST-style heuristic local alignment:
       1. Seed: exact word (k-mer) matches between query and subject.
       2. Extend: ungapped extension of each seed into a maximal HSP
          (High-scoring Segment Pair) with an X-drop threshold.
       3. Refine: gapped Smith-Waterman within the best HSP window.
+
+    ``score_fn`` (e.g. BLOSUM62) replaces match/mismatch when supplied.
 
     Returns (q_ali, s_ali, match_line, score, identity_pct, aln_len).
     """
@@ -228,58 +373,16 @@ def blast_align(query, subject, word_size=11, match=2, mismatch=-1,
 
     # For very short inputs fall back to full gapped alignment.
     if n < word_size or m < word_size:
-        return smith_waterman_align(query, subject, match, mismatch, gap_open, gap_extend)
+        return smith_waterman_align(query, subject, match, mismatch,
+                                    gap_open, gap_extend, score_fn)
 
-    q_index = build_word_index(query, word_size)
-    best_hsp = None  # (score, q_start, q_end, s_start, s_end)
-
-    # Step 1 + 2: seed and ungapped extend
-    for sj in range(0, m - word_size + 1):
-        word = subject[sj:sj+word_size]
-        for qi in q_index.get(word, []):
-            si = sj
-            # score of the seed itself
-            seed = word_size * match
-
-            # --- extend right ---
-            score = seed
-            best_score = seed
-            best_off = 0
-            off = 0
-            while qi + word_size + off < n and si + word_size + off < m:
-                score += match if query[qi+word_size+off] == subject[si+word_size+off] else mismatch
-                off += 1
-                if score > best_score:
-                    best_score = score
-                    best_off = off
-                if score < best_score - x_drop:
-                    break
-            right_end_q = qi + word_size + best_off
-            right_end_s = si + word_size + best_off
-            right_score = best_score
-
-            # --- extend left ---
-            score = right_score
-            best_score_left = right_score
-            best_off_left = 0
-            off = 0
-            while qi - 1 - off >= 0 and si - 1 - off >= 0:
-                score += match if query[qi-1-off] == subject[si-1-off] else mismatch
-                off += 1
-                if score > best_score_left:
-                    best_score_left = score
-                    best_off_left = off
-                if score < best_score_left - x_drop:
-                    break
-            q_start = qi - best_off_left
-            s_start = si - best_off_left
-            hsp = (best_score_left, q_start, right_end_q, s_start, right_end_s)
-            if best_hsp is None or hsp[0] > best_hsp[0]:
-                best_hsp = hsp
+    best_hsp = blast_hsp(query, subject, word_size, match, mismatch,
+                         x_drop, score_fn)
 
     if best_hsp is None or best_hsp[0] <= 0:
         # No seed found: fall back to gapped local alignment across whole seqs.
-        return smith_waterman_align(query, subject, match, mismatch, gap_open, gap_extend)
+        return smith_waterman_align(query, subject, match, mismatch,
+                                    gap_open, gap_extend, score_fn)
 
     _, q_start, q_end, s_start, s_end = best_hsp
 
@@ -293,7 +396,7 @@ def blast_align(query, subject, word_size=11, match=2, mismatch=-1,
     s_win = subject[s_win_start:s_win_end]
 
     qa_win, sa_win, ml_win, score, identity, aln_len = smith_waterman_align(
-        q_win, s_win, match, mismatch, gap_open, gap_extend
+        q_win, s_win, match, mismatch, gap_open, gap_extend, score_fn
     )
 
     if aln_len == 0:
@@ -302,18 +405,28 @@ def blast_align(query, subject, word_size=11, match=2, mismatch=-1,
     return qa_win, sa_win, ml_win, score, identity, aln_len
 
 
-def calculate_evalue(score, query_length, db_size=97, match=2):
-    """Score-based expected-value estimate for the BLAST algorithm."""
-    if score <= 0:
-        return 1.0
-    try:
-        lambda_ = 2 * math.log(max(match, 2)) / 1.0  # ~per-residue scaling
-        evalue = (db_size * (query_length / 100.0)) * math.exp(-lambda_ * score)
-        evalue = min(max(evalue, 1e-300), 10.0)
-        # Keep ~3 significant digits so very small E-values are not lost.
-        return float("%.3g" % evalue)
-    except Exception:
-        return 10.0
+def bit_score(raw_score, scheme):
+    """NCBI BLAST bit score: S' = (lambda * S - ln K) / ln 2."""
+    if raw_score <= 0:
+        return 0.0
+    lam, k = scheme["lambda"], scheme["K"]
+    return round((lam * raw_score - math.log(k)) / math.log(2), 1)
+
+
+def calculate_evalue(raw_score, query_length, db_length, scheme):
+    """Karlin-Altschul E-value: E = K * m * n * exp(-lambda * S).
+
+    m = query length, n = total residues in the searched database,
+    S = raw alignment score, lambda/K = statistics of the scoring scheme.
+    """
+    m = max(int(query_length or 0), 1)
+    n = max(int(db_length or 0), 1)
+    if raw_score <= 0:
+        return float(min(scheme["K"] * m * n, 1e300))
+    lam, k = scheme["lambda"], scheme["K"]
+    evalue = k * m * n * math.exp(-lam * raw_score)
+    evalue = min(max(evalue, 1e-300), 1e300)
+    return float("%.3g" % evalue)
 
 
 def format_evalue(value):
@@ -346,33 +459,68 @@ def query_coverage(q_alignment, query_length):
 
 
 def search_database(query_sequence, database_file, blast_type="n"):
-    """Run the BLAST algorithm against a local database and return top hits."""
-    word_size = 11 if blast_type == "n" else 3
+    """Run the BLAST algorithm against a local database and return top hits.
+
+    Uses NCBI-style scoring (BLASTn: +2/-3, gap 5/2; BLASTp: BLOSUM62,
+    gap 11/1) and reports raw score, bit score, Karlin-Altschul E-value,
+    identity and query coverage for every hit.
+    """
+    scheme = scheme_for(blast_type)
     database = load_database(database_file)
-    results  = []
+    db_length = sum(len(entry["sequence"]) for entry in database)
+
+    # Stage 1: cheap ungapped seed-and-extend for every database entry.
+    candidates = []
     for entry in database:
-        qa, sa, ml, score, identity, aln_len = blast_align(
-            query_sequence, entry["sequence"], word_size=word_size
+        hsp = blast_hsp(
+            query_sequence, entry["sequence"],
+            word_size=scheme["word_size"],
+            match=scheme["match"], mismatch=scheme["mismatch"],
+            x_drop=scheme["x_drop"], score_fn=scheme["score_fn"],
         )
-        evalue = calculate_evalue(score, len(query_sequence))
+        candidates.append((hsp[0] if hsp else 0, entry))
+
+    # Stage 2: BLAST only runs the expensive gapped refinement on the most
+    # promising HSPs, not on every subject in the database.
+    promising = [c for c in candidates if c[0] > 0]
+    promising.sort(key=lambda c: c[0], reverse=True)
+    refine = promising[:15] if promising else candidates[:5]
+
+    results = []
+    for _, entry in refine:
+        qa, sa, ml, raw_score, identity, aln_len = blast_align(
+            query_sequence, entry["sequence"],
+            word_size=scheme["word_size"],
+            match=scheme["match"], mismatch=scheme["mismatch"],
+            gap_open=scheme["gap_open"], gap_extend=scheme["gap_extend"],
+            x_drop=scheme["x_drop"], score_fn=scheme["score_fn"],
+        )
+        evalue = calculate_evalue(raw_score, len(query_sequence), db_length, scheme)
         results.append({
             "name":        entry["id"],
             "description": entry["description"],
-            "score":       score,
+            "score":       raw_score,
+            "bit_score":   bit_score(raw_score, scheme),
             "similarity":  identity,
             "coverage":    query_coverage(qa, len(query_sequence)),
             "evalue":      evalue,
             "sequence":    entry["sequence"],
         })
-    # BLAST convention: rank by alignment score, then identity as a tie-break.
+    # BLAST convention: rank by score, then identity as a tie-break.
     results.sort(key=lambda x: (x["score"], x["similarity"]), reverse=True)
     return results[:5]
 
 
 def build_alignment(query_seq, subject_seq, blast_type="n"):
     """Build alignment display blocks using the BLAST algorithm."""
-    word_size = 11 if blast_type == "n" else 3
-    qa, sa, ml, score = blast_align(query_seq, subject_seq, word_size=word_size)[:4]
+    scheme = scheme_for(blast_type)
+    qa, sa, ml, score = blast_align(
+        query_seq, subject_seq,
+        word_size=scheme["word_size"],
+        match=scheme["match"], mismatch=scheme["mismatch"],
+        gap_open=scheme["gap_open"], gap_extend=scheme["gap_extend"],
+        x_drop=scheme["x_drop"], score_fn=scheme["score_fn"],
+    )[:4]
     max_len = len(qa)
 
     chunk_size = 60
@@ -531,7 +679,12 @@ def blastp_results():
     seq_param = request.args.get("seq", "")
     if seq_param:
         sequence = re.sub(r"[^ARNDCQEGHILKMFPSTWYVX]", "", seq_param.upper())
-        results = search_database(sequence, DATABASE_PROTEIN, "p")
+        # The POST handler already searched this exact sequence; reuse the
+        # stored hits instead of running the search again on the redirect.
+        if sequence == session.get("blastp_query") and session.get("blastp_results"):
+            results = session["blastp_results"]
+        else:
+            results = search_database(sequence, DATABASE_PROTEIN, "p")
         session["last_blast"]     = "p"
         session["blastp_query"]   = sequence
         session["query_sequence"] = sequence
@@ -546,7 +699,12 @@ def blastn_results():
     seq_param = request.args.get("seq", "")
     if seq_param:
         sequence = re.sub(r"[^ATGCN]", "", seq_param.upper())
-        results = search_database(sequence, DATABASE_NUCLEOTIDE, "n")
+        # The POST handler already searched this exact sequence; reuse the
+        # stored hits instead of running the search again on the redirect.
+        if sequence == session.get("blastn_query") and session.get("blastn_results"):
+            results = session["blastn_results"]
+        else:
+            results = search_database(sequence, DATABASE_NUCLEOTIDE, "n")
         session["last_blast"]     = "n"
         session["blastn_query"]   = sequence
         session["query_sequence"] = sequence
@@ -596,14 +754,15 @@ def build_results_csv(blast_type, sequence, results):
     writer.writerow(["Query length", len(sequence)])
     writer.writerow(["Generated", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
     writer.writerow([])
-    writer.writerow(["NDM Variant", "Score", "Identity (%)", "Query Coverage (%)", "E-value", "Description", "Sequence"])
+    writer.writerow(["NDM Variant", "Bit Score", "E-value", "Identity (%)", "Query Coverage (%)", "Raw Score", "Description", "Sequence"])
     for item in results:
         writer.writerow([
             item.get("name", ""),
-            item.get("score", ""),
+            item.get("bit_score", ""),
+            format_evalue(item.get("evalue", "")),
             item.get("similarity", ""),
             item.get("coverage", ""),
-            format_evalue(item.get("evalue", "")),
+            item.get("score", ""),
             item.get("description", ""),
             item.get("sequence", ""),
         ])
@@ -779,15 +938,22 @@ def details(name):
 
     hit = None
     if query_seq and subject_seq:
-        qa, sa, ml, score, identity, aln_len = blast_align(
-            query_seq, subject_seq, word_size=(11 if blast_type == "n" else 3)
+        scheme = scheme_for(blast_type)
+        qa, sa, ml, raw_score, identity, aln_len = blast_align(
+            query_seq, subject_seq,
+            word_size=scheme["word_size"],
+            match=scheme["match"], mismatch=scheme["mismatch"],
+            gap_open=scheme["gap_open"], gap_extend=scheme["gap_extend"],
+            x_drop=scheme["x_drop"], score_fn=scheme["score_fn"],
         )
-        evalue = calculate_evalue(score, len(query_seq))
+        db_file = DATABASE_NUCLEOTIDE if blast_type == "n" else DATABASE_PROTEIN
+        db_length = sum(len(e["sequence"]) for e in load_database(db_file))
         hit = {
             "similarity": identity,
             "coverage":   query_coverage(qa, len(query_seq)),
-            "score":      score,
-            "evalue":     evalue,
+            "score":      raw_score,
+            "bit_score":  bit_score(raw_score, scheme),
+            "evalue":     calculate_evalue(raw_score, len(query_seq), db_length, scheme),
             "aln_len":    aln_len,
         }
 

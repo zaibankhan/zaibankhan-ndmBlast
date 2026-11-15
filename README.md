@@ -19,8 +19,7 @@ This project was developed as part of my **M.Sc. Bioinformatics** coursework at 
 - 🔬 BLASTN (Nucleotide Sequence Search)
 - 🧪 BLASTP (Protein Sequence Search)
 - 🗂 Local NDM Variant Database
-- 📊 Similarity Score Calculation
-- 📈 E-value Display
+- 📊 Bit Score, E-value, Percentage Identity & Query Coverage (NCBI BLAST methodology)
 - 📝 Variant Details Page
 - 🌐 User-friendly Web Interface
 - ⚡ Fast Local Sequence Search
@@ -99,7 +98,7 @@ Every results page and the History page has a **Save** button with two options:
 - **Download as CSV** — downloads the data straight to your device.
 - **Send to Email** — enter an address and the data is emailed as a CSV attachment.
 
-Results exports include: NDM Variant, Identity (%), E-value, Description, Sequence.
+Results exports include: NDM Variant, Bit Score, E-value, Identity (%), Query Coverage (%), Raw Score, Description, Sequence.
 History exports include: Time, Type, Query, Query Length, Top Hit, Identity, E-value.
 
 ### Enabling email delivery
